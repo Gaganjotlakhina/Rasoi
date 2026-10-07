@@ -1,6 +1,6 @@
-# WhatToEat — realtime family kitchen stock (repo: `rasoi`)
+# Rasoi — realtime family kitchen stock (repo: `rasoi`)
 
-Phase 1 of the WhatToEat family meal-planning app: one shared kitchen stock
+Phase 1+2 of the Rasoi family meal-planning app: one shared kitchen stock
 list (Kitchen / Fridge / Freezer) that updates **live** on every family
 member's phone the moment anyone changes anything.
 
@@ -58,9 +58,23 @@ takes ~30–60s to wake; stock data is safe). Upgrade to Starter for always-on.
   lassi, …) plus an optional `health_note`, per-serving macros, meal types
   and diet flags.
 
+## API (Phase 2 additions)
+
+- `GET /api/households/:code/suggest?meal=&diet=&minProtein=&maxCalories=&maxCarbs=&servings=&heritage=`
+  ranked dish ideas scored by % of ingredients in the household's stock.
+  Diet filter is hierarchical: `vegan` < `veg` < `egg` < `nonveg` (a `veg`
+  filter also shows vegan dishes). `heritage=punjabi-classic` returns only
+  the Back home classics shelf.
+- `GET /api/households/:code/recipes/:id?servings=` — full recipe detail
+  with scaled ingredients, in-stock flags, and missing list.
+- `POST /api/households/:code/recipes/:id/cook` `{member_id, servings}` —
+  deducts used ingredients from stock (unit-aware, floors at 0) and
+  broadcasts to the family live. Returns `{used, missing}`.
+
+Recipes auto-seed on first boot (`seed.js`, idempotent by name).
+
 ## Roadmap
 
-- **Phase 2**: dish suggestions matched to stock, heritage Punjabi recipe
-  collection, macro filters (protein/carbs/fat/calories), servings scaler.
-- **Phase 3**: cooking deducts stock, To Buy list (manual + auto-add on
-  depletion), family voting on meals.
+- **Phase 2**: ✅ dish suggestions matched to stock, heritage Punjabi recipe
+  collection (28 recipes), macro filters, servings scaler, cook-deducts-stock.
+- **Phase 3**: To Buy list (manual + auto-add on depletion), family voting on meals.
