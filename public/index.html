@@ -89,7 +89,9 @@
   <section id="view-home" class="hidden">
     <div class="tabs">
       <button id="tabStock" class="tab active">🧊 Stock</button>
-      <button id="tabEat" class="tab">🍽️ What to eat?</button>
+      <button id="tabEat" class="tab">🍽️ Eat?</button>
+      <button id="tabTobuy" class="tab">🛒 To Buy</button>
+      <button id="tabVote" class="tab">🗳️ Vote</button>
     </div>
 
     <div id="stockPane">
@@ -139,6 +141,33 @@
       </div>
 
       <div id="suggestResults"></div>
+    </div>
+
+    <div id="tobuyPane" class="hidden">
+      <div class="card">
+        <h3 style="margin:0 0 2px">🛒 To Buy</h3>
+        <p style="margin:0 0 4px;color:var(--muted);font-size:13px">Run out of something while cooking? It lands here by itself 🤖</p>
+        <label class="field">ITEM</label>
+        <input type="text" id="tbName" placeholder="e.g. Milk, Atta" maxlength="60" autocomplete="off">
+        <div class="row2">
+          <div><label class="field">QTY</label><input type="number" id="tbQty" min="0" step="any" value="1"></div>
+          <div><label class="field">UNIT</label>
+            <select id="tbUnit">
+              <option>pcs</option><option>g</option><option>kg</option><option>ml</option>
+              <option>L</option><option>cups</option><option>tbsp</option><option>tsp</option>
+              <option>packets</option><option>bunches</option>
+            </select>
+          </div>
+        </div>
+        <button class="btn" id="btnTbAdd">Add to list →</button>
+      </div>
+      <div id="tobuyList"></div>
+    </div>
+
+    <div id="votePane" class="hidden">
+      <div id="pollOpen"></div>
+      <div id="pollStartWrap"></div>
+      <div id="pollHistory"></div>
     </div>
   </section>
 

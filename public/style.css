@@ -324,3 +324,44 @@ label.field { display: block; font-size: 13px; font-weight: 700; color: var(--mu
 .ing-qty { font-weight: 700; color: var(--brand-dark); white-space: nowrap; font-size: 13px; }
 .rsteps { margin: 0; padding-left: 20px; font-size: 14px; }
 .rsteps li { margin-bottom: 8px; }
+
+/* ---------- to buy (Phase 3) ---------- */
+#tobuyList { display: flex; flex-direction: column; gap: 8px; margin-top: 10px; }
+.tb-item { display: flex; align-items: center; gap: 10px; background: var(--card);
+  border: 1px solid var(--line); border-radius: var(--radius); padding: 10px 12px; box-shadow: var(--shadow); }
+.tb-item.done { opacity: 0.6; }
+.tb-item.done .tb-name { text-decoration: line-through; }
+.tb-check { border: none; background: none; font-size: 22px; cursor: pointer; padding: 2px; }
+.tb-info { flex: 1; min-width: 0; }
+.tb-name { font-weight: 700; }
+.tb-sub { font-size: 13px; color: var(--muted); display: flex; align-items: center; gap: 6px; flex-wrap: wrap; }
+.src-badge { font-size: 11px; font-weight: 700; padding: 2px 8px; border-radius: 999px; }
+.src-badge.auto { background: #E8F0FE; color: #2B5CB8; }
+.src-badge.manual { background: var(--brand-soft); color: var(--brand-dark); }
+
+/* ---------- family vote (Phase 3) ---------- */
+.poll-card { border: 2px solid var(--gold); }
+.poll-sub { color: var(--muted); font-size: 13px; margin: 2px 0 10px; }
+.cand-card { border: 1.5px solid var(--line); border-radius: 12px; padding: 10px 12px;
+  margin: 8px 0; cursor: pointer; background: #FFFEFB; }
+.cand-card.voted { border-color: var(--green); background: var(--green-soft); }
+.cand-name { font-weight: 700; margin-bottom: 6px; }
+.tally-bar { height: 10px; border-radius: 999px; background: var(--line); overflow: hidden; }
+.tally-fill { height: 100%; background: linear-gradient(90deg, var(--gold), var(--brand));
+  border-radius: 999px; transition: width .4s; }
+.cand-foot { display: flex; align-items: center; justify-content: space-between; margin-top: 6px; }
+.cand-votes { font-size: 13px; color: var(--muted); font-weight: 700; }
+.voter-row { display: flex; gap: 4px; }
+.avatar-chip.sm { width: 26px; height: 26px; font-size: 15px; }
+.my-vote { font-size: 12px; color: var(--green); font-weight: 700; margin-top: 4px; }
+.pick-list { max-height: 260px; overflow-y: auto; border: 1px solid var(--line);
+  border-radius: 12px; margin: 8px 0; }
+.pick-row { display: flex; align-items: center; gap: 10px; padding: 10px 12px;
+  border-bottom: 1px solid var(--line); cursor: pointer; }
+.pick-row:last-child { border-bottom: none; }
+.pick-row.on { background: var(--green-soft); }
+.pick-name { flex: 1; font-weight: 600; }
+.winner-banner { font-size: 17px; font-weight: 800; color: var(--brand-dark); }
+.hist-title { margin: 18px 4px 8px; font-size: 16px; }
+.hist-card { padding: 12px 14px; }
+.hist-sub { font-size: 13px; color: var(--muted); margin-top: 4px; }

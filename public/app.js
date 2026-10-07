@@ -266,6 +266,8 @@
     });
     socket.on('activity', function (a) { toast(a.text, a.avatar, a.avatar_kind); });
     socket.on('presence', function (p) { S.presence = p.members; renderPresence(); });
+    socket.on('tobuy:changed', function () { refreshTobuy(); });
+    socket.on('poll:changed', function () { if (curTab === 'vote') loadPolls(); });
     // auto-reconnect is built into socket.io; rejoin on reconnect
     socket.io.on('reconnect', function () { socket.emit('join', { code: S.code, memberId: S.member.id }); });
   }
@@ -489,15 +491,25 @@
   // ---------- what to eat? (Phase 2) ----------
   var E = { meal: 'any', diet: 'any', servings: 4, detail: null, classicsLoaded: false };
 
+  // ---------- tabs (Phase 1 stock / Phase 2 eat / Phase 3 tobuy + vote) ----------
+  var TABS = ['stock', 'eat', 'tobuy', 'vote'];
+  var curTab = 'stock';
+  function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
   function switchTab(which) {
-    $('tabStock').classList.toggle('active', which === 'stock');
-    $('tabEat').classList.toggle('active', which === 'eat');
-    $('stockPane').classList.toggle('hidden', which !== 'stock');
-    $('eatPane').classList.toggle('hidden', which !== 'eat');
+    curTab = which;
+    TABS.forEach(function (t) {
+      $('tab' + cap(t)).classList.toggle('active', t === which);
+      $(t + 'Pane').classList.toggle('hidden', t !== which);
+    });
+    if (which === 'tobuy') refreshTobuy();
+    if (which === 'vote') loadPolls();
+    if (which === 'eat') loadClassics();
     window.scrollTo(0, 0);
   }
-  $('tabStock').addEventListener('click', function () { switchTab('stock'); });
-  $('tabEat').addEventListener('click', function () { switchTab('eat'); loadClassics(); });
+  TABS.forEach(function (t) {
+    $('tab' + cap(t)).addEventListener('click', function () { switchTab(t); });
+  });
 
   function wirePills(id, key) {
     $(id).querySelectorAll('button').forEach(function (b) {
@@ -678,6 +690,205 @@
     } catch (e) { toast('Hmm: ' + e.message); }
     $('btnCook').disabled = false;
   });
+
+  // ---------- to buy (Phase 3) ----------
+  var T = { items: [] };
+
+  function refreshTobuy() {
+    if (!S.code) return;
+    api('/api/households/' + encodeURIComponent(S.code) + '/tobuy')
+      .then(function (d) { T.items = d.items; renderTobuy(); })
+      .catch(function () { toast('Couldn\'t load the list 😕'); });
+  }
+
+  function renderTobuy() {
+    var box = $('tobuyList'); box.innerHTML = '';
+    if (!T.items.length) {
+      box.innerHTML = '<div class="empty-note">List is empty — add something, or cook and watch it fill itself 🛒</div>';
+      return;
+    }
+    T.items.forEach(function (it) {
+      var d = document.createElement('div');
+      d.className = 'tb-item' + (it.done ? ' done' : '');
+      var badge = it.source === 'auto'
+        ? '<span class="src-badge auto" title="Added automatically when it ran out">🤖 auto</span>'
+        : '<span class="src-badge manual">✋ manual</span>';
+      d.innerHTML =
+        '<button class="tb-check" title="Bought it?">' + (it.done ? '✅' : '⬜') + '</button>' +
+        '<div class="tb-info"><div class="tb-name">' + esc(it.name) + '</div>' +
+        '<div class="tb-sub">' + fmtQty(it.qty) + ' ' + esc(it.unit) + ' · ' + badge + '</div></div>' +
+        '<button class="icon-btn tb-del" title="Remove">🗑️</button>';
+      d.querySelector('.tb-check').addEventListener('click', function () {
+        api('/api/households/' + encodeURIComponent(S.code) + '/tobuy/' + it.id, {
+          method: 'PATCH', body: JSON.stringify({ member_id: S.member.id, done: !it.done }),
+        }).catch(function (e) { toast('Hmm: ' + e.message); });
+      });
+      d.querySelector('.tb-del').addEventListener('click', function () {
+        if (!confirm('Remove "' + it.name + '" from the list?')) return;
+        api('/api/households/' + encodeURIComponent(S.code) + '/tobuy/' + it.id +
+            '?member_id=' + S.member.id, { method: 'DELETE' })
+          .catch(function (e) { toast('Hmm: ' + e.message); });
+      });
+      box.appendChild(d);
+    });
+  }
+
+  $('btnTbAdd').addEventListener('click', async function () {
+    var name = $('tbName').value.trim();
+    if (!name) { toast('Name the item first 🏷️'); return; }
+    try {
+      await api('/api/households/' + encodeURIComponent(S.code) + '/tobuy', {
+        method: 'POST',
+        body: JSON.stringify({
+          name: name, qty: Number($('tbQty').value) || 1,
+          unit: $('tbUnit').value, member_id: S.member.id,
+        }),
+      });
+      $('tbName').value = ''; $('tbQty').value = 1;
+    } catch (e) { toast('Hmm: ' + e.message); }
+  });
+
+  // ---------- family vote (Phase 3) ----------
+  var V = { open: null, history: [], recipes: [], picked: {}, slot: 'dinner' };
+
+  function loadPolls() {
+    if (!S.code) return;
+    api('/api/households/' + encodeURIComponent(S.code) + '/polls?member_id=' + S.member.id)
+      .then(function (d) { V.open = d.open; V.history = d.history; renderVote(); })
+      .catch(function () { toast('Couldn\'t load votes 😕'); });
+  }
+
+  function renderVote() {
+    var openBox = $('pollOpen'); openBox.innerHTML = '';
+    $('pollStartWrap').innerHTML = '';
+    if (V.open) renderOpenPoll(V.open, openBox);
+    else renderPollStart();
+    renderPollHistory();
+  }
+
+  function renderOpenPoll(p, box) {
+    var el = document.createElement('div');
+    el.className = 'card poll-card';
+    el.innerHTML = '<h3 style="margin:0 0 2px">🗳️ Family vote — ' + esc(p.meal_slot) + '</h3>' +
+      '<p class="poll-sub">started by ' + esc(p.created_by ? p.created_by.name : 'someone') +
+      ' · ' + p.total_votes + ' of ' + p.total_members + ' voted</p>' +
+      '<div class="poll-cands"></div>' +
+      '<button class="btn secondary" id="btnClosePoll">Close vote & decide 🏁</button>';
+    box.appendChild(el);
+    var cbox = el.querySelector('.poll-cands');
+    var maxVotes = Math.max.apply(null, [1].concat(p.candidates.map(function (c) { return c.votes; })));
+    p.candidates.forEach(function (c) {
+      var card = document.createElement('div');
+      card.className = 'cand-card' + (c.my_voted ? ' voted' : '');
+      var pct = Math.round((c.votes / maxVotes) * 100);
+      var voters = c.voters.map(function (v) { return avatarHTML(v, 'avatar-chip sm'); }).join('');
+      card.innerHTML =
+        (c.heritage ? '<div class="heritage-badge">🏠 Back home classic</div>' : '') +
+        '<div class="cand-name">' + esc(c.name) + ' <span class="diet-ic">' + dietIcon(c.diet) + '</span></div>' +
+        '<div class="tally-bar"><div class="tally-fill" style="width:' + pct + '%"></div></div>' +
+        '<div class="cand-foot"><span class="cand-votes">' + c.votes + (c.votes === 1 ? ' vote' : ' votes') + '</span>' +
+        '<span class="voter-row">' + voters + '</span></div>' +
+        (c.my_voted ? '<div class="my-vote">✓ your pick</div>' : '');
+      card.addEventListener('click', function () { castVote(p.id, c.id); });
+      cbox.appendChild(card);
+    });
+    el.querySelector('#btnClosePoll').addEventListener('click', function () {
+      if (!confirm('Close the vote and declare the winner?')) return;
+      api('/api/households/' + encodeURIComponent(S.code) + '/polls/' + p.id + '/close', {
+        method: 'POST', body: JSON.stringify({ member_id: S.member.id }),
+      }).catch(function (e) { toast('Hmm: ' + e.message); });
+    });
+  }
+
+  function renderPollStart() {
+    var box = $('pollStartWrap');
+    var el = document.createElement('div');
+    el.className = 'card';
+    el.innerHTML = '<h3 style="margin:0 0 2px">🗳️ Start a family vote</h3>' +
+      '<p class="poll-sub">Pick a meal, nominate up to 4 dishes, everyone taps their favourite.</p>' +
+      '<label class="field">MEAL</label>' +
+      '<div class="pills" id="pollSlots">' +
+      '<button data-v="breakfast">🌅 Breakfast</button>' +
+      '<button data-v="lunch">☀️ Lunch</button>' +
+      '<button data-v="dinner" class="active">🌙 Dinner</button>' +
+      '<button data-v="snack">🍿 Snack</button></div>' +
+      '<label class="field">DISHES (up to 4)</label>' +
+      '<input type="text" id="pollSearch" placeholder="Search dishes… 🔍" autocomplete="off">' +
+      '<div id="pollPickList" class="pick-list"><div class="empty-note">Loading dishes…</div></div>' +
+      '<button class="btn" id="btnStartPoll">Start vote 🗳️</button>';
+    box.appendChild(el);
+    V.slot = 'dinner'; V.picked = {};
+    el.querySelectorAll('#pollSlots button').forEach(function (b) {
+      b.addEventListener('click', function () {
+        el.querySelectorAll('#pollSlots button').forEach(function (x) { x.classList.remove('active'); });
+        b.classList.add('active');
+        V.slot = b.getAttribute('data-v');
+      });
+    });
+    var renderPicks = function (filter) {
+      var list = el.querySelector('#pollPickList'); list.innerHTML = '';
+      var recs = V.recipes.filter(function (r) {
+        return !filter || r.name.toLowerCase().indexOf(filter) >= 0;
+      }).slice(0, 40);
+      if (!recs.length) { list.innerHTML = '<div class="empty-note">No dishes match 🙂</div>'; return; }
+      recs.forEach(function (r) {
+        var row = document.createElement('div');
+        var isOn = !!V.picked[r.id];
+        row.className = 'pick-row' + (isOn ? ' on' : '');
+        row.innerHTML = '<span class="pick-tick">' + (isOn ? '✅' : '⬜') + '</span>' +
+          '<span class="pick-name">' + esc(r.name) + '</span>' +
+          '<span class="diet-ic">' + dietIcon(r.diet) + '</span>';
+        row.addEventListener('click', function () {
+          if (V.picked[r.id]) delete V.picked[r.id];
+          else {
+            if (Object.keys(V.picked).length >= 4) { toast('Max 4 dishes per vote 🗳️'); return; }
+            V.picked[r.id] = true;
+          }
+          renderPicks(el.querySelector('#pollSearch').value.trim().toLowerCase());
+        });
+        list.appendChild(row);
+      });
+    };
+    el.querySelector('#pollSearch').addEventListener('input', function (e) {
+      renderPicks(e.target.value.trim().toLowerCase());
+    });
+    var ready = V.recipes.length ? Promise.resolve() :
+      api('/api/households/' + encodeURIComponent(S.code) + '/recipes').then(function (d) { V.recipes = d.recipes; });
+    ready.then(function () { renderPicks(''); }).catch(function () {
+      el.querySelector('#pollPickList').innerHTML = '<div class="empty-note">Couldn\'t load dishes 😕</div>';
+    });
+    el.querySelector('#btnStartPoll').addEventListener('click', function () {
+      var ids = Object.keys(V.picked);
+      if (!ids.length) { toast('Nominate at least one dish 🍽️'); return; }
+      api('/api/households/' + encodeURIComponent(S.code) + '/polls', {
+        method: 'POST',
+        body: JSON.stringify({ member_id: S.member.id, meal_slot: V.slot, recipe_ids: ids }),
+      }).catch(function (e) { toast('Hmm: ' + e.message); });
+    });
+  }
+
+  function renderPollHistory() {
+    var box = $('pollHistory'); box.innerHTML = '';
+    if (!V.history.length) return;
+    var h = document.createElement('h3');
+    h.className = 'hist-title'; h.textContent = '📜 Past votes';
+    box.appendChild(h);
+    V.history.forEach(function (p) {
+      var el = document.createElement('div');
+      el.className = 'card hist-card';
+      var cands = p.candidates.map(function (c) { return esc(c.name) + ' (' + c.votes + ')'; }).join(' · ');
+      el.innerHTML = '<div class="winner-banner">🎉 ' + esc(p.winner ? p.winner.name : 'no winner') + '</div>' +
+        '<div class="hist-sub">' + esc(p.meal_slot) + ' · ' + cands + '</div>';
+      box.appendChild(el);
+    });
+  }
+
+  function castVote(pollId, recipeId) {
+    api('/api/households/' + encodeURIComponent(S.code) + '/polls/' + pollId + '/vote', {
+      method: 'POST', body: JSON.stringify({ member_id: S.member.id, recipe_id: recipeId }),
+    }).catch(function (e) { toast('Hmm: ' + e.message); });
+    // the poll:changed broadcast refreshes the UI live
+  }
 
   // ---------- boot ----------
   (function boot() {
