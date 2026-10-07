@@ -232,6 +232,11 @@ label.field { display: block; font-size: 13px; font-weight: 700; color: var(--mu
   flex: 0 0 30px; height: 30px; border-radius: 50%; border: none; cursor: pointer;
   background: var(--red-soft); color: var(--red); font-weight: 800; font-size: 14px;
 }
+.scan-thumb {
+  width: 100%; border-radius: 12px; margin-top: 10px;
+  border: 1.5px solid var(--line); display: block;
+}
+.voice-status.reading { color: var(--brand-dark); font-weight: 700; animation: micpulse 1.4s ease infinite; }
 
 /* ---------- tabs ---------- */
 .tabs { display: flex; gap: 8px; margin: 4px 0 6px; }

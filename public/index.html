@@ -184,12 +184,21 @@
     <div class="name-row">
       <input type="text" id="fName" placeholder="e.g. Eggs, Atta, Milk" maxlength="60" autocomplete="off">
       <button id="micBtn" class="mic-btn hidden" title="Speak your list 🎤">🎤</button>
+      <button id="scanBtn" class="mic-btn" title="Scan a receipt 📸">📸</button>
     </div>
     <div id="voicePane" class="hidden">
       <div id="voiceStatus" class="voice-status">Tap the mic and speak your list — e.g. “two kilos of atta, a dozen eggs”</div>
       <div id="voiceTranscript" class="voice-transcript hidden"></div>
       <div id="voiceChips"></div>
       <button class="btn small hidden" id="btnVoiceAdd" style="width:100%;margin-top:10px">Add items →</button>
+    </div>
+    <div id="scanPane" class="hidden">
+      <div id="scanStatus" class="voice-status">Snap a grocery list or store receipt — I’ll read the items 📸</div>
+      <img id="scanThumb" class="scan-thumb hidden" alt="Photo preview">
+      <div id="scanChips"></div>
+      <button class="btn small hidden" id="btnScanRead" style="width:100%;margin-top:10px">Read items 📖</button>
+      <button class="btn small hidden" id="btnScanAdd" style="width:100%;margin-top:10px">Add items →</button>
+      <input type="file" id="scanFile" accept="image/*" capture="environment" class="hidden">
     </div>
     <div class="row2">
       <div><label class="field">QUANTITY</label><input type="number" id="fQty" min="0" step="any" value="1"></div>

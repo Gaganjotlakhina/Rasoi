@@ -297,6 +297,7 @@
 
   function openModal(id) {
     resetVoice();
+    resetScan();
     $('editId').value = id || '';
     var it = id ? S.stock.find(function (x) { return x.id === id; }) : null;
     $('modalTitle').textContent = it ? 'Edit item' : 'Add to stock';
@@ -381,6 +382,7 @@
   }
 
   function toggleVoice() {
+    resetScan();
     if (voiceListening) {
       stopVoice();
       $('voiceStatus').textContent = voiceChips.length
@@ -466,11 +468,12 @@
 
   $('micBtn').addEventListener('click', toggleVoice);
 
-  $('btnVoiceAdd').addEventListener('click', async function () {
+  // shared by voice chips and scan chips: batch-add confirmed items to stock
+  async function addChipsToStock(chips) {
     var locBtn = $('fLoc').querySelector('button.active');
     var location = locBtn ? locBtn.getAttribute('data-loc') : 'kitchen';
-    var items = voiceChips.filter(function (c) { return c.name.trim(); });
-    if (!items.length) return;
+    var items = chips.filter(function (c) { return c.name.trim(); });
+    if (!items.length) return 0;
     var n = 0;
     for (var i = 0; i < items.length; i++) {
       try {
@@ -484,8 +487,139 @@
         n++;
       } catch (e) { /* keep going with the rest */ }
     }
+    return { added: n, total: items.length };
+  }
+
+  $('btnVoiceAdd').addEventListener('click', async function () {
+    var r = await addChipsToStock(voiceChips);
     closeModal();
-    toast(n === items.length ? 'Added ' + n + ' items 🎉' : 'Added ' + n + ' of ' + items.length + ' (some failed)');
+    toast(r.added === r.total ? 'Added ' + r.added + ' items 🎉' : 'Added ' + r.added + ' of ' + r.total + ' (some failed)');
+  });
+
+  // ---------- receipt scan (photo -> stock, Phase 4) ----------
+  var scanChips = []; // {name, qty, unit} — user confirms before anything is added
+  var scanImageData = null; // downscaled JPEG data URL sent to /scan
+
+  function resetScan() {
+    scanChips = [];
+    scanImageData = null;
+    $('scanPane').classList.add('hidden');
+    var th = $('scanThumb'); th.classList.add('hidden'); th.removeAttribute('src');
+    $('scanChips').innerHTML = '';
+    $('btnScanRead').classList.add('hidden');
+    $('btnScanAdd').classList.add('hidden');
+    var st = $('scanStatus');
+    st.textContent = 'Snap a grocery list or store receipt — I’ll read the items 📸';
+    st.classList.remove('reading');
+    var f = $('scanFile'); if (f) f.value = '';
+  }
+
+  function downscaleImage(dataUrl, maxDim, cb) {
+    var img = new Image();
+    img.onload = function () {
+      var scale = Math.min(1, maxDim / Math.max(img.width, img.height));
+      var c = document.createElement('canvas');
+      c.width = Math.max(1, Math.round(img.width * scale));
+      c.height = Math.max(1, Math.round(img.height * scale));
+      c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+      cb(c.toDataURL('image/jpeg', 0.85));
+    };
+    img.onerror = function () { cb(null); };
+    img.src = dataUrl;
+  }
+
+  $('scanBtn').addEventListener('click', function () {
+    resetVoice();
+    $('scanPane').classList.remove('hidden');
+    $('scanFile').click();
+  });
+
+  $('scanFile').addEventListener('change', function () {
+    var file = this.files && this.files[0];
+    if (!file) return;
+    if (!/^image\//.test(file.type)) { toast('That’s not a photo 🖼️'); return; }
+    var rd = new FileReader();
+    rd.onload = function () {
+      downscaleImage(rd.result, 1600, function (small) {
+        if (!small) { toast('Couldn’t read that photo — try another 📸'); return; }
+        scanImageData = small;
+        scanChips = [];
+        $('scanChips').innerHTML = '';
+        $('btnScanAdd').classList.add('hidden');
+        var th = $('scanThumb');
+        th.src = small;
+        th.classList.remove('hidden');
+        $('btnScanRead').classList.remove('hidden');
+        $('scanStatus').textContent = 'Looking good — tap “Read items” and I’ll pull out the groceries 📖';
+      });
+    };
+    rd.readAsDataURL(file);
+  });
+
+  function addScanChips(parsed) {
+    var added = 0;
+    parsed.forEach(function (p) {
+      var dup = scanChips.some(function (c) { return c.name.toLowerCase() === p.name.toLowerCase() && c.unit === p.unit; });
+      if (!dup) { scanChips.push({ name: p.name, qty: p.qty, unit: p.unit }); added++; }
+    });
+    if (added) renderScanChips();
+    return added;
+  }
+
+  function renderScanChips() {
+    var box = $('scanChips'); box.innerHTML = '';
+    scanChips.forEach(function (c, idx) {
+      var d = document.createElement('div');
+      d.className = 'vchip';
+      var opts = VOICE_UNITS.map(function (u) {
+        return '<option' + (u === c.unit ? ' selected' : '') + '>' + u + '</option>';
+      }).join('');
+      d.innerHTML = '<input type="text" data-f="name" value="' + esc(c.name) + '" maxlength="60">' +
+        '<input type="number" data-f="qty" value="' + c.qty + '" min="0" step="any">' +
+        '<select data-f="unit">' + opts + '</select>' +
+        '<button class="vchip-x" title="Remove">×</button>';
+      d.querySelector('[data-f="name"]').addEventListener('input', function (e) { c.name = e.target.value; });
+      d.querySelector('[data-f="qty"]').addEventListener('input', function (e) { c.qty = Number(e.target.value) || 0; });
+      d.querySelector('[data-f="unit"]').addEventListener('change', function (e) { c.unit = e.target.value; });
+      d.querySelector('.vchip-x').addEventListener('click', function () { scanChips.splice(idx, 1); renderScanChips(); });
+      box.appendChild(d);
+    });
+    var btn = $('btnScanAdd');
+    btn.classList.toggle('hidden', !scanChips.length);
+    btn.textContent = 'Add ' + scanChips.length + (scanChips.length === 1 ? ' item' : ' items') + ' →';
+  }
+
+  $('btnScanRead').addEventListener('click', async function () {
+    if (!scanImageData) return;
+    var st = $('scanStatus');
+    st.textContent = '📖 Reading your receipt… give me ~20 seconds';
+    st.classList.add('reading');
+    $('btnScanRead').classList.add('hidden');
+    try {
+      var r = await api('/api/households/' + encodeURIComponent(S.code) + '/scan', {
+        method: 'POST',
+        body: JSON.stringify({ member_id: S.member.id, image: scanImageData }),
+      });
+      var items = (r && r.items) || [];
+      var n = addScanChips(items);
+      st.classList.remove('reading');
+      st.textContent = n
+        ? 'Found ' + n + (n === 1 ? ' item' : ' items') + ' — fix anything, then add 👇'
+        : 'Couldn’t find any items — try a clearer, straighter photo 📸';
+      if (!n) $('btnScanRead').classList.remove('hidden');
+    } catch (e) {
+      st.classList.remove('reading');
+      st.textContent = e.message && /not available/i.test(e.message)
+        ? 'Receipt scanning isn’t switched on yet — tell the family chef 📸'
+        : 'Hmm, that didn’t work — try a clearer photo 📸';
+      $('btnScanRead').classList.remove('hidden');
+    }
+  });
+
+  $('btnScanAdd').addEventListener('click', async function () {
+    var r = await addChipsToStock(scanChips);
+    closeModal();
+    toast(r.added === r.total ? 'Added ' + r.added + ' items 🎉' : 'Added ' + r.added + ' of ' + r.total + ' (some failed)');
   });
 
   // ---------- what to eat? (Phase 2) ----------
