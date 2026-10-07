@@ -73,3 +73,45 @@ CREATE TABLE IF NOT EXISTS rasoi_recipe_steps (
   text TEXT NOT NULL
 );
 CREATE INDEX IF NOT EXISTS rasoi_recipe_steps_recipe_idx ON rasoi_recipe_steps(recipe_id);
+
+-- ---------------------------------------------------------------------------
+-- Phase 3: To Buy grocery list + family voting.
+-- ---------------------------------------------------------------------------
+CREATE TABLE IF NOT EXISTS rasoi_tobuy (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  household_id UUID NOT NULL REFERENCES rasoi_households(id) ON DELETE CASCADE,
+  name TEXT NOT NULL,
+  qty NUMERIC NOT NULL DEFAULT 1 CHECK (qty >= 0),
+  unit TEXT NOT NULL DEFAULT 'pcs',
+  source TEXT NOT NULL DEFAULT 'manual' CHECK (source IN ('manual', 'auto')),
+  added_by UUID REFERENCES rasoi_members(id) ON DELETE SET NULL,
+  done BOOLEAN NOT NULL DEFAULT FALSE,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+CREATE INDEX IF NOT EXISTS rasoi_tobuy_household_idx ON rasoi_tobuy(household_id);
+
+CREATE TABLE IF NOT EXISTS rasoi_polls (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  household_id UUID NOT NULL REFERENCES rasoi_households(id) ON DELETE CASCADE,
+  meal_slot TEXT NOT NULL DEFAULT 'dinner',
+  status TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open', 'closed')),
+  winner_recipe_id UUID REFERENCES rasoi_recipes(id) ON DELETE SET NULL,
+  created_by UUID REFERENCES rasoi_members(id) ON DELETE SET NULL,
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  closed_at TIMESTAMPTZ
+);
+CREATE INDEX IF NOT EXISTS rasoi_polls_household_idx ON rasoi_polls(household_id);
+
+CREATE TABLE IF NOT EXISTS rasoi_poll_candidates (
+  poll_id UUID NOT NULL REFERENCES rasoi_polls(id) ON DELETE CASCADE,
+  recipe_id UUID NOT NULL REFERENCES rasoi_recipes(id) ON DELETE CASCADE,
+  PRIMARY KEY (poll_id, recipe_id)
+);
+
+CREATE TABLE IF NOT EXISTS rasoi_votes (
+  poll_id UUID NOT NULL REFERENCES rasoi_polls(id) ON DELETE CASCADE,
+  member_id UUID NOT NULL REFERENCES rasoi_members(id) ON DELETE CASCADE,
+  recipe_id UUID NOT NULL REFERENCES rasoi_recipes(id) ON DELETE CASCADE,
+  voted_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  PRIMARY KEY (poll_id, member_id)
+);
