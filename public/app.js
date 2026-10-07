@@ -19,6 +19,10 @@
     onboardCode: null,
   };
 
+  // motion tracking: which stock rows we've already seen, and last qty per item
+  var seenStockIds = {};
+  var prevStockQty = {};
+
   // ---------- helpers ----------
   function $(id) { return document.getElementById(id); }
   function esc(s) { return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
@@ -204,7 +208,12 @@
       } else {
         items.forEach(function (it) {
           var zero = it.qty <= 0 ? ' zero' : '';
-          html += '<div class="stock-item" data-id="' + it.id + '">' +
+          var motion = '';
+          if (!seenStockIds[it.id]) motion += ' item-enter';
+          var pq = prevStockQty[it.id];
+          if (pq !== undefined && it.qty < pq) motion += ' qty-pulse';
+          if (pq !== undefined && pq > 0 && it.qty === 0) motion += ' used-flash';
+          html += '<div class="stock-item' + motion + '" data-id="' + it.id + '">' +
             '<div class="stock-info"><div class="stock-name">' + esc(it.name) + '</div>' +
             '<div class="stock-qty' + zero + '">' + fmtQty(it.qty) + ' ' + esc(it.unit) +
             (it.qty <= 0 ? ' · all gone!' : '') + '</div></div>' +
@@ -213,6 +222,8 @@
             '<button class="step-btn" data-act="inc" title="Add one">+</button>' +
             '<button class="icon-btn" data-act="edit" title="Edit">✏️</button>' +
             '</div></div>';
+          seenStockIds[it.id] = true;
+          prevStockQty[it.id] = it.qty;
         });
       }
       sec.innerHTML = html;
@@ -504,6 +515,7 @@
     scanChips = [];
     scanImageData = null;
     $('scanPane').classList.add('hidden');
+    $('scanWrap').classList.remove('scanning');
     var th = $('scanThumb'); th.classList.add('hidden'); th.removeAttribute('src');
     $('scanChips').innerHTML = '';
     $('btnScanRead').classList.add('hidden');
@@ -594,6 +606,7 @@
     var st = $('scanStatus');
     st.textContent = '📖 Reading your receipt… give me ~20 seconds';
     st.classList.add('reading');
+    $('scanWrap').classList.add('scanning');
     $('btnScanRead').classList.add('hidden');
     try {
       var r = await api('/api/households/' + encodeURIComponent(S.code) + '/scan', {
@@ -603,12 +616,14 @@
       var items = (r && r.items) || [];
       var n = addScanChips(items);
       st.classList.remove('reading');
+      $('scanWrap').classList.remove('scanning');
       st.textContent = n
         ? 'Found ' + n + (n === 1 ? ' item' : ' items') + ' — fix anything, then add 👇'
         : 'Couldn’t find any items — try a clearer, straighter photo 📸';
       if (!n) $('btnScanRead').classList.remove('hidden');
     } catch (e) {
       st.classList.remove('reading');
+      $('scanWrap').classList.remove('scanning');
       st.textContent = e.message && /not available/i.test(e.message)
         ? 'Receipt scanning isn’t switched on yet — tell the family chef 📸'
         : 'Hmm, that didn’t work — try a clearer photo 📸';
@@ -634,7 +649,14 @@
     curTab = which;
     TABS.forEach(function (t) {
       $('tab' + cap(t)).classList.toggle('active', t === which);
-      $(t + 'Pane').classList.toggle('hidden', t !== which);
+      var pane = $(t + 'Pane');
+      var showIt = t === which;
+      pane.classList.toggle('hidden', !showIt);
+      if (showIt) {
+        pane.classList.remove('pane-enter');
+        void pane.offsetWidth; // restart the transition animation
+        pane.classList.add('pane-enter');
+      }
     });
     if (which === 'tobuy') refreshTobuy();
     if (which === 'vote') loadPolls();
@@ -674,26 +696,46 @@
 
   function dietIcon(d) { return { vegan: '🌱', veg: '🥬', egg: '🥚', nonveg: '🍗' }[d] || '🍽️'; }
 
-  function macroChips(m) {
-    return '<span class="mchip">💪 ' + m.protein_g + 'g protein</span>' +
-      '<span class="mchip">🔥 ' + m.calories + ' cal</span>' +
-      '<span class="mchip">🌾 ' + m.carbs_g + 'g carbs</span>';
+  // macro visualization: animated bars + calories, instead of plain chips
+  function macroViz(m) {
+    function bar(icon, label, val, unit, max, cls) {
+      var pct = Math.max(5, Math.min(100, Math.round((val / max) * 100)));
+      return '<div class="macro-bar-row"><span class="macro-ic">' + icon + '</span>' +
+        '<div class="macro-track"><div class="macro-fill ' + cls + '" style="--w:' + pct + '%"></div></div>' +
+        '<span class="macro-val">' + val + unit + ' ' + label + '</span></div>';
+    }
+    return '<div class="macro-viz">' +
+      bar('💪', 'protein', m.protein_g, 'g', 40, 'protein') +
+      bar('🌾', 'carbs', m.carbs_g, 'g', 80, 'carbs') +
+      bar('🧈', 'fat', m.fat_g, 'g', 40, 'fat') +
+      '</div><div class="macro-cal">🔥 ' + m.calories + ' calories per serving</div>';
   }
 
   function suggestionCard(v) {
     var pct = v.matchPct;
-    var cls = pct >= 80 ? 'great' : (pct >= 50 ? 'ok' : 'low');
+    var C = (2 * Math.PI * 26).toFixed(1);
+    var off = (2 * Math.PI * 26 * (1 - pct / 100)).toFixed(1);
+    var gid = 'rg' + v.id;
     var miss = v.missing.length
       ? '<div class="missing-note">Missing: ' + esc(v.missing.slice(0, 3).map(function (m) { return m.name; }).join(', ')) +
         (v.missing.length > 3 ? ' +' + (v.missing.length - 3) + ' more' : '') + '</div>'
       : '<div class="all-have">✅ You have everything!</div>';
     return '<div class="sugg-card" data-id="' + v.id + '">' +
       (v.heritage ? '<div class="heritage-badge">🏠 Back home classic</div>' : '') +
-      '<div class="sugg-title">' + esc(v.name) + ' <span class="diet-ic">' + dietIcon(v.diet) + '</span></div>' +
-      '<div class="sugg-desc">' + esc(v.description) + '</div>' +
-      '<div class="match-row"><div class="match-bar"><div class="match-fill ' + cls + '" style="width:' + pct + '%"></div></div>' +
-      '<span class="match-pct">' + pct + '% in stock</span></div>' +
-      '<div class="macro-row">' + macroChips(v.macros) + '</div>' + miss + '</div>';
+      '<div class="sugg-top">' +
+      '<svg class="sugg-ring" viewBox="0 0 64 64" aria-label="' + pct + '% in stock">' +
+      '<defs><linearGradient id="' + gid + '" x1="0" y1="0" x2="1" y2="1">' +
+      '<stop offset="0%" stop-color="#f2b13d"/><stop offset="100%" stop-color="#ff6b35"/></linearGradient></defs>' +
+      '<circle class="ring-bg" cx="32" cy="32" r="26" fill="none" stroke-width="7"/>' +
+      '<circle class="ring-fg" cx="32" cy="32" r="26" fill="none" stroke="url(#' + gid + ')" stroke-width="7"' +
+      ' stroke-dasharray="' + C + '" stroke-dashoffset="' + off + '"/>' +
+      '<text x="32" y="37" text-anchor="middle">' + pct + '%</text>' +
+      '</svg>' +
+      '<div class="sugg-head"><div class="sugg-title">' + esc(v.name) +
+      ' <span class="diet-ic">' + dietIcon(v.diet) + '</span></div>' +
+      '<div class="sugg-desc">' + esc(v.description) + '</div></div>' +
+      '</div>' +
+      macroViz(v.macros) + miss + '</div>';
   }
 
   function attachCardClicks(box) {
@@ -708,7 +750,7 @@
     suggestApi({ heritage: 'punjabi-classic', servings: 4 }).then(function (d) {
       var box = $('classicsShelf');
       box.innerHTML = '';
-      if (!d.suggestions.length) { box.innerHTML = '<div class="shelf-loading">No classics yet 🪔</div>'; return; }
+      if (!d.suggestions.length) { box.innerHTML = '<div class="shelf-loading">No classics yet 🍲</div>'; return; }
       d.suggestions.forEach(function (v) {
         var el = document.createElement('div');
         el.className = 'shelf-card';
@@ -774,8 +816,7 @@
       '<span class="meta-chip">' + dietIcon(v.diet) + ' ' + esc(v.diet) + '</span>' +
       '<span class="meta-chip">⏱ ' + v.prep_minutes + ' min</span>' +
       '<span class="meta-chip">' + esc(v.meal_types.join(' · ')) + '</span>';
-    $('recipeMacros').innerHTML = macroChips(v.macros) +
-      '<span class="mchip">🧈 ' + v.macros.fat_g + 'g fat</span>';
+    $('recipeMacros').innerHTML = macroViz(v.macros);
     var hn = $('recipeHealth');
     if (v.health_note) { hn.textContent = '💛 ' + v.health_note; hn.classList.remove('hidden'); }
     else hn.classList.add('hidden');
@@ -806,6 +847,11 @@
     if (!E.detail || !S.member) return;
     var v = E.detail;
     $('btnCook').disabled = true;
+    // sizzle flourish: flame licks up the modal before it closes
+    var fx = document.createElement('div');
+    fx.className = 'flame-overlay';
+    $('recipeModal').appendChild(fx);
+    setTimeout(function () { fx.remove(); }, 950);
     try {
       var r = await api('/api/households/' + encodeURIComponent(S.code) + '/recipes/' + v.id + '/cook', {
         method: 'POST',
@@ -928,6 +974,7 @@
     });
     el.querySelector('#btnClosePoll').addEventListener('click', function () {
       if (!confirm('Close the vote and declare the winner?')) return;
+      V.justClosed = true; // the poll:changed broadcast will reload; newest history card erupts
       api('/api/households/' + encodeURIComponent(S.code) + '/polls/' + p.id + '/close', {
         method: 'POST', body: JSON.stringify({ member_id: S.member.id }),
       }).catch(function (e) { toast('Hmm: ' + e.message); });
@@ -1007,14 +1054,31 @@
     var h = document.createElement('h3');
     h.className = 'hist-title'; h.textContent = '📜 Past votes';
     box.appendChild(h);
-    V.history.forEach(function (p) {
+    V.history.forEach(function (p, idx) {
       var el = document.createElement('div');
       el.className = 'card hist-card';
       var cands = p.candidates.map(function (c) { return esc(c.name) + ' (' + c.votes + ')'; }).join(' · ');
       el.innerHTML = '<div class="winner-banner">🎉 ' + esc(p.winner ? p.winner.name : 'no winner') + '</div>' +
         '<div class="hist-sub">' + esc(p.meal_slot) + ' · ' + cands + '</div>';
+      // celebratory eruption, only for a freshly-closed winner
+      if (V.justClosed && idx === 0 && p.winner) {
+        el.classList.add('winner-erupt');
+        var colors = ['#f2b13d', '#ff9a2e', '#ff5147', '#7fd08c', '#ffd98a'];
+        for (var i = 0; i < 16; i++) {
+          var sp = document.createElement('span');
+          sp.className = 'burst-p';
+          var ang = (i / 16) * Math.PI * 2 + Math.random() * 0.4;
+          var dist = 90 + Math.random() * 80;
+          sp.style.setProperty('--bx', (Math.cos(ang) * dist).toFixed(0) + 'px');
+          sp.style.setProperty('--by', (Math.sin(ang) * dist).toFixed(0) + 'px');
+          sp.style.background = colors[i % colors.length];
+          sp.style.boxShadow = '0 0 12px ' + colors[i % colors.length];
+          el.appendChild(sp);
+        }
+      }
       box.appendChild(el);
     });
+    V.justClosed = false;
   }
 
   function castVote(pollId, recipeId) {
