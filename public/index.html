@@ -5,17 +5,42 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
 <title>Kya Khaye — what to eat, from your own kitchen</title>
 <meta name="description" content="Kya Khaye: the family kitchen stock list that updates live on everyone's phone, with dish ideas matched to what's in stock.">
+<meta name="theme-color" content="#0b0906">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,700;0,9..144,800;0,9..144,900;1,9..144,700&family=Space+Grotesk:wght@400;600;700;800&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="/style.css">
 <script src="/socket.io/socket.io.js"></script>
 <script src="/voice-parse.js"></script>
 </head>
 <body>
+<div class="glow-orb orb-1"></div>
+<div class="glow-orb orb-2"></div>
+<div class="glow-orb orb-3"></div>
 
 <!-- shared header (home view only) -->
 <header id="appHeader" class="app-header hidden">
   <div class="inner">
     <div class="brand-row">
-      <div class="brand-logo">🪔</div>
+      <div class="brand-logo" aria-hidden="true">
+        <svg class="handi" viewBox="0 0 120 120">
+          <defs>
+            <radialGradient id="hgA" cx="50%" cy="30%" r="78%">
+              <stop offset="0%" stop-color="#4a2c12"/><stop offset="100%" stop-color="#170d04"/>
+            </radialGradient>
+            <linearGradient id="sgA" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0%" stop-color="#ff9a2e" stop-opacity="0"/><stop offset="100%" stop-color="#ffd98a"/>
+            </linearGradient>
+          </defs>
+          <path class="steam s1" d="M46 42 C41 33 51 27 46 16" stroke="url(#sgA)" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+          <path class="steam s2" d="M60 44 C55 33 65 27 60 14" stroke="url(#sgA)" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+          <path class="steam s3" d="M74 42 C69 33 79 27 74 16" stroke="url(#sgA)" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+          <path d="M16 58 C16 90 36 104 60 104 C84 104 104 90 104 58 L16 58 Z" fill="url(#hgA)" stroke="#f2b13d" stroke-width="3.5"/>
+          <ellipse cx="60" cy="58" rx="44" ry="12" fill="#241505" stroke="#f2b13d" stroke-width="3.5"/>
+          <ellipse cx="60" cy="58" rx="29" ry="7" fill="#0d0702" opacity="0.9"/>
+          <path d="M30 79 C38 91 50 97 62 98" stroke="#ff9a2e" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.45"/>
+        </svg>
+      </div>
       <div class="brand-name">Kya Khaye<small>FAMILY KITCHEN · LIVE</small></div>
     </div>
     <div class="hh-row">
@@ -31,13 +56,32 @@
   <!-- LANDING -->
   <section id="view-landing">
     <div class="hero">
-      <div class="big-logo">🪔</div>
-      <h1>Kya Khaye</h1>
-      <p><b>Kya khaye? Decide together.</b><br>One kitchen list the whole family sees — live.</p>
+      <div class="big-logo reveal reveal-1" aria-hidden="true">
+        <svg class="handi" viewBox="0 0 120 120">
+          <defs>
+            <radialGradient id="hgB" cx="50%" cy="30%" r="78%">
+              <stop offset="0%" stop-color="#4a2c12"/><stop offset="100%" stop-color="#170d04"/>
+            </radialGradient>
+            <linearGradient id="sgB" x1="0" y1="1" x2="0" y2="0">
+              <stop offset="0%" stop-color="#ff9a2e" stop-opacity="0"/><stop offset="100%" stop-color="#ffd98a"/>
+            </linearGradient>
+          </defs>
+          <path class="steam s1" d="M46 42 C41 33 51 27 46 16" stroke="url(#sgB)" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+          <path class="steam s2" d="M60 44 C55 33 65 27 60 14" stroke="url(#sgB)" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+          <path class="steam s3" d="M74 42 C69 33 79 27 74 16" stroke="url(#sgB)" stroke-width="4.5" fill="none" stroke-linecap="round"/>
+          <path d="M16 58 C16 90 36 104 60 104 C84 104 104 90 104 58 L16 58 Z" fill="url(#hgB)" stroke="#f2b13d" stroke-width="3.5"/>
+          <ellipse cx="60" cy="58" rx="44" ry="12" fill="#241505" stroke="#f2b13d" stroke-width="3.5"/>
+          <ellipse cx="60" cy="58" rx="29" ry="7" fill="#0d0702" opacity="0.9"/>
+          <path d="M30 79 C38 91 50 97 62 98" stroke="#ff9a2e" stroke-width="3" fill="none" stroke-linecap="round" opacity="0.45"/>
+        </svg>
+      </div>
+      <h1 class="reveal reveal-2">Kya Khaye</h1>
+      <p class="tagline reveal reveal-3">Kya khaye? Decide together.</p>
+      <p class="sub reveal reveal-4">One kitchen list the whole family sees — live.</p>
     </div>
 
-    <div class="card">
-      <h3 style="margin:0 0 4px">🏠 Start a household</h3>
+    <div class="card reveal reveal-5">
+      <h3 style="margin:0 0 4px;font-family:var(--font-display)">🏠 Start a household</h3>
       <p style="margin:0;color:var(--muted);font-size:14px">Name it anything — "Sharma Kitchen", "Apartment 4B"…</p>
       <label class="field">HOUSEHOLD NAME</label>
       <input type="text" id="createName" placeholder="e.g. Sharma Kitchen" maxlength="60" autocomplete="off">
@@ -47,10 +91,10 @@
     <div class="divider">or join your family</div>
 
     <div class="card">
-      <h3 style="margin:0 0 4px">🔑 Have an invite code?</h3>
+      <h3 style="margin:0 0 4px;font-family:var(--font-display)">🔑 Have an invite code?</h3>
       <p style="margin:0;color:var(--muted);font-size:14px">Ask a family member for the 6-letter code.</p>
       <label class="field">INVITE CODE</label>
-      <input type="text" id="joinCode" placeholder="e.g. KX7Q2M" maxlength="6" autocomplete="off" style="text-transform:uppercase;letter-spacing:2px;font-weight:700">
+      <input type="text" id="joinCode" placeholder="KX7Q2M" maxlength="6" autocomplete="off">
       <button class="btn secondary" id="btnJoin">Join household →</button>
     </div>
   </section>
@@ -58,11 +102,10 @@
   <!-- ONBOARDING -->
   <section id="view-onboard" class="hidden">
     <div class="hero" style="padding-top:20px">
-      <div class="big-logo" style="width:64px;height:64px;font-size:34px">👋</div>
-      <h1 style="font-size:24px">Who's this?</h1>
-      <p>Pick a name and a face so the family knows who used the last egg 🥚</p>
+      <h1 style="font-size:40px" class="reveal reveal-1">Who's this?</h1>
+      <p class="sub reveal reveal-2">Pick a name and a face so the family knows who used the last egg 🥚</p>
     </div>
-    <div class="card">
+    <div class="card reveal reveal-3">
       <label class="field" style="margin-top:0">YOUR NAME</label>
       <input type="text" id="memberName" placeholder="e.g. Gaganjot" maxlength="60" autocomplete="off">
       <label class="field">YOUR AVATAR</label>
@@ -87,26 +130,19 @@
 
   <!-- HOME -->
   <section id="view-home" class="hidden">
-    <div class="tabs">
-      <button id="tabStock" class="tab active">🧊 Stock</button>
-      <button id="tabEat" class="tab">🍽️ Eat?</button>
-      <button id="tabTobuy" class="tab">🛒 To Buy</button>
-      <button id="tabVote" class="tab">🗳️ Vote</button>
-    </div>
-
     <div id="stockPane">
       <div id="stockSections"></div>
     </div>
 
     <div id="eatPane" class="hidden">
       <div class="shelf-wrap">
-        <h2 class="shelf-title">🏠 Back home classics</h2>
+        <h2 class="shelf-title">Back home classics</h2>
         <p class="shelf-sub">Dadi-nani recipes — the food grandparents thrived on</p>
-        <div id="classicsShelf" class="shelf"><div class="shelf-loading">Loading classics… 🪔</div></div>
+        <div id="classicsShelf" class="shelf"><div class="shelf-loading">Loading classics… 🍲</div></div>
       </div>
 
       <div class="card">
-        <h3 style="margin:0 0 2px">🔍 Find a dish</h3>
+        <h3 style="margin:0 0 2px;font-family:var(--font-display)">🔍 Find a dish</h3>
         <p style="margin:0 0 4px;color:var(--muted);font-size:13px">Matched against your family's stock, live.</p>
         <label class="field">MEAL</label>
         <div class="pills" id="mealPills">
@@ -145,7 +181,7 @@
 
     <div id="tobuyPane" class="hidden">
       <div class="card">
-        <h3 style="margin:0 0 2px">🛒 To Buy</h3>
+        <h3 style="margin:0 0 2px;font-family:var(--font-display)">🛒 To Buy</h3>
         <p style="margin:0 0 4px;color:var(--muted);font-size:13px">Run out of something while cooking? It lands here by itself 🤖</p>
         <label class="field">ITEM</label>
         <input type="text" id="tbName" placeholder="e.g. Milk, Atta" maxlength="60" autocomplete="off">
@@ -169,6 +205,13 @@
       <div id="pollStartWrap"></div>
       <div id="pollHistory"></div>
     </div>
+
+    <nav class="tabs" aria-label="Sections">
+      <button id="tabStock" class="tab active"><span class="tab-ic">🧊</span><span>Stock</span></button>
+      <button id="tabEat" class="tab"><span class="tab-ic">🍽️</span><span>Eat?</span></button>
+      <button id="tabTobuy" class="tab"><span class="tab-ic">🛒</span><span>To Buy</span></button>
+      <button id="tabVote" class="tab"><span class="tab-ic">🗳️</span><span>Vote</span></button>
+    </nav>
   </section>
 
 </main>
@@ -194,7 +237,10 @@
     </div>
     <div id="scanPane" class="hidden">
       <div id="scanStatus" class="voice-status">Snap a grocery list or store receipt — I’ll read the items 📸</div>
-      <img id="scanThumb" class="scan-thumb hidden" alt="Photo preview">
+      <div class="scan-wrap" id="scanWrap">
+        <img id="scanThumb" class="scan-thumb hidden" alt="Photo preview">
+        <span class="sweep"></span>
+      </div>
       <div id="scanChips"></div>
       <button class="btn small hidden" id="btnScanRead" style="width:100%;margin-top:10px">Read items 📖</button>
       <button class="btn small hidden" id="btnScanAdd" style="width:100%;margin-top:10px">Add items →</button>
@@ -229,10 +275,10 @@
 
 <!-- recipe detail modal -->
 <div id="recipeBack" class="modal-back hidden">
-  <div class="modal">
+  <div class="modal" id="recipeModal">
     <h3 id="recipeName">–</h3>
     <div id="recipeMeta" class="recipe-meta"></div>
-    <div id="recipeMacros" class="macro-row"></div>
+    <div id="recipeMacros"></div>
     <div id="recipeHealth" class="health-note hidden"></div>
     <div class="row2" style="margin-top:10px;align-items:end">
       <div><label class="field" style="margin-top:0">SERVINGS</label>
