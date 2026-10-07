@@ -11,7 +11,12 @@ const PORT = process.env.PORT || 3000;
 const DATABASE_URL = process.env.DATABASE_URL || '';
 if (!DATABASE_URL) console.warn('[whattoeat] WARNING: DATABASE_URL is not set');
 
-const pool = new Pool({ connectionString: DATABASE_URL || undefined, max: 10 });
+const pool = new Pool({
+  connectionString: DATABASE_URL || undefined,
+  max: 10,
+  // Render's external Postgres URLs require TLS; local dev databases usually don't.
+  ...( /render\.com|sslmode=require/.test(DATABASE_URL) ? { ssl: { rejectUnauthorized: false } } : {} ),
+});
 
 async function migrate() {
   const sql = fs.readFileSync(path.join(__dirname, 'schema.sql'), 'utf8');
