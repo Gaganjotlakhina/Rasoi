@@ -24,7 +24,7 @@ const fs = require('fs');
 
   let code = 0;
   try {
-    for (const f of ['test/voice-parse-test.js', 'test/smoke.js', 'test/suggest-test.js', 'test/phase3-test.js']) {
+    for (const f of ['test/voice-parse-test.js', 'test/smoke.js', 'test/suggest-test.js', 'test/phase3-test.js', 'test/scan-test.js']) {
       console.log('\n===== ' + f + ' =====');
       const r = spawnSync('node', [f], {
         cwd: __dirname + '/..',

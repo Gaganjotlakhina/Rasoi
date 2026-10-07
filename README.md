@@ -73,8 +73,25 @@ takes ~30–60s to wake; stock data is safe). Upgrade to Starter for always-on.
 
 Recipes auto-seed on first boot (`seed.js`, idempotent by name).
 
+## API (Phase 4 additions)
+
+- `POST /api/households/:code/scan` `{member_id, image}` — `image` is a
+  JPEG/PNG data URL (client downscales to max 1600px). Runs tesseract OCR
+  server-side (`oem 1 -psm 6 -l eng`) and parses the text into candidate
+  items `[{name, qty, unit}]` for the user to confirm. Returns 400 on a
+  missing/invalid image, 403 on an unknown member, 503 when the tesseract
+  binary isn't installed (the Docker image installs `tesseract-ocr` +
+  `tesseract-ocr-data-eng`; local dev may not have it). OCR can take
+  10–30s on the free tier — the request simply takes its time.
+- `parse-receipt.js` — receipt/grocery-list text parser (shared by the
+  server and tests): drops totals/tax/tender/change/store furniture lines,
+  handles `2 x` / `x2` / `2X` / `2 @` quantities and kg/g/L/ml/pack/pcs
+  units. Best-effort by design — the app always shows editable chips for
+  confirm/correct before anything reaches stock.
+
 ## Roadmap
 
 - **Phase 2**: ✅ dish suggestions matched to stock, heritage Punjabi recipe
   collection (28 recipes), macro filters, servings scaler, cook-deducts-stock.
-- **Phase 3**: To Buy list (manual + auto-add on depletion), family voting on meals.
+- **Phase 3**: ✅ To Buy list (manual + auto-add on depletion), family voting on meals.
+- **Phase 4**: ✅ photo snapshot — scan a grocery list or store receipt into stock.
