@@ -1,4 +1,4 @@
-/* WhatToEat frontend — Phase 1: households, onboarding, live stock. */
+/* Kya Khaye frontend — Phase 1: households, onboarding, live stock. */
 (function () {
   'use strict';
 

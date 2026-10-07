@@ -1,4 +1,4 @@
-// Rasoi Phase 2 suggest test.
+// Kya Khaye Phase 2 suggest test.
 // Boots the real server (which auto-seeds recipes) and verifies:
 //  1. seed idempotency (seedRecipes twice -> same count)
 //  2. suggest ranking by stock match %
@@ -36,7 +36,7 @@ async function waitHealth() {
 }
 
 (async () => {
-  console.log('Rasoi suggest test — starting server...');
+  console.log('Kya Khaye suggest test — starting server...');
   const srv = spawn('node', ['server.js'], {
     cwd: __dirname + '/..',
     env: Object.assign({}, process.env, { PORT: String(PORT), DATABASE_URL: DB }),

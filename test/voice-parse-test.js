@@ -1,4 +1,4 @@
-// Unit tests for the WhatToEat voice-list parser. No DB needed.
+// Unit tests for the Kya Khaye voice-list parser. No DB needed.
 // Run: node test/voice-parse-test.js
 const { parseVoiceList } = require('../public/voice-parse.js');
 

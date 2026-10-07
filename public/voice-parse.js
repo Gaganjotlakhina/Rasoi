@@ -1,4 +1,4 @@
-/* WhatToEat voice-list parser — shared between browser and node tests.
+/* Kya Khaye voice-list parser — shared between browser and node tests.
  * Turns a spoken grocery list like "two kilos of atta, half kilo paneer,
  * a dozen eggs" into [{name, qty, unit}]. Forgiving by design: the UI always
  * shows editable chips for confirm/correct before anything is added. */

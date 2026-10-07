@@ -1,6 +1,6 @@
-# Rasoi — realtime family kitchen stock (repo: `rasoi`)
+# Kya Khaye — realtime family kitchen stock (repo: `rasoi`)
 
-Phase 1+2 of the Rasoi family meal-planning app: one shared kitchen stock
+Phase 1+2 of the Kya Khaye family meal-planning app: one shared kitchen stock
 list (Kitchen / Fridge / Freezer) that updates **live** on every family
 member's phone the moment anyone changes anything.
 
@@ -38,7 +38,7 @@ All tables are prefixed `rasoi_` so this can share a Postgres instance.
 2. Select the **`rasoi`** repo (`Gaganjotlakhina/rasoi`)
 3. When prompted for `DATABASE_URL`, paste the **External Database URL**
    of the existing 1v1 app's Postgres
-   (Render dashboard → that database → Connections). Rasoi's `rasoi_`-prefixed
+   (Render dashboard → that database → Connections). Kya Khaye's `rasoi_`-prefixed
    tables will not clash with the 1v1 tables.
 4. Apply — every push to `main` redeploys automatically.
 

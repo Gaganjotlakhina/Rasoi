@@ -1,4 +1,4 @@
-// Rasoi Phase 3 test: To Buy list (manual + auto-add on cook-to-zero, dedupe)
+// Kya Khaye Phase 3 test: To Buy list (manual + auto-add on cook-to-zero, dedupe)
 // and family voting (create/vote/change-vote/close, majority + tie-break,
 // one-vote-per-member) plus live socket events for both.
 // Requires: DATABASE_URL. Run: npm test
@@ -49,7 +49,7 @@ async function waitHealth() {
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
 
 (async () => {
-  console.log('Rasoi Phase 3 test — starting server...');
+  console.log('Kya Khaye Phase 3 test — starting server...');
   const srv = spawn('node', ['server.js'], {
     cwd: __dirname + '/..',
     env: Object.assign({}, process.env, { PORT: String(PORT), DATABASE_URL: DB }),

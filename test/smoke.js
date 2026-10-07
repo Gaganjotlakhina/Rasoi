@@ -1,4 +1,4 @@
-// WhatToEat Phase 1 smoke test.
+// Kya Khaye Phase 1 smoke test.
 // Spins up the server, then verifies:
 //  1. REST: create household -> join code works
 //  2. REST: member onboarding (emoji + photo avatar kinds)
@@ -54,7 +54,7 @@ async function waitHealth() {
 }
 
 (async () => {
-  console.log('WhatToEat smoke test — starting server...');
+  console.log('Kya Khaye smoke test — starting server...');
   const srv = spawn('node', ['server.js'], {
     cwd: __dirname + '/..',
     env: Object.assign({}, process.env, { PORT: String(PORT), DATABASE_URL: DB }),

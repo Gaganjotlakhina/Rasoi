@@ -1,4 +1,4 @@
-// Rasoi test runner: boots one embedded Postgres, then runs every test file
+// Kya Khaye test runner: boots one embedded Postgres, then runs every test file
 // with DATABASE_URL set. Run: npm test  (as a non-root user; postgres refuses root)
 const { spawnSync } = require('child_process');
 const fs = require('fs');
