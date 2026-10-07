@@ -1,4 +1,4 @@
-// Rasoi seed data — Phase 2.
+// Kya Khaye seed data — Phase 2.
 // Heritage Punjabi collection (heritage='punjabi-classic') + everyday dishes.
 // Idempotent: seedRecipes(pool) skips recipes whose name already exists.
 const RECIPES = [

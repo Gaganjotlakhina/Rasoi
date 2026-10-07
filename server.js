@@ -1,4 +1,4 @@
-// Rasoi server — realtime family kitchen stock + dish suggestions. Phase 2.
+// Kya Khaye server — realtime family kitchen stock + dish suggestions. Phase 3.
 const express = require('express');
 const http = require('http');
 const path = require('path');
@@ -10,7 +10,7 @@ const { recipeView, rankRecipes, applyFilters, normalizeName, convertQty } = req
 
 const PORT = process.env.PORT || 3000;
 const DATABASE_URL = process.env.DATABASE_URL || '';
-if (!DATABASE_URL) console.warn('[rasoi] WARNING: DATABASE_URL is not set');
+if (!DATABASE_URL) console.warn('[kyakhaye] WARNING: DATABASE_URL is not set');
 
 const pool = new Pool({
   connectionString: DATABASE_URL || undefined,
@@ -69,7 +69,7 @@ const app = express();
 app.use(express.json({ limit: '1mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.get('/health', (req, res) => res.json({ ok: true, app: 'rasoi', phase: 3 }));
+app.get('/health', (req, res) => res.json({ ok: true, app: 'kyakhaye', phase: 3 }));
 
 // ---- households ----
 app.post('/api/households', async (req, res) => {
@@ -732,19 +732,19 @@ async function start() {
   try {
     if ((await recipeCount(pool)) === 0) {
       const n = await seedRecipes(pool);
-      console.log(`[rasoi] seeded ${n} recipes`);
+      console.log(`[kyakhaye] seeded ${n} recipes`);
     }
-  } catch (e) { console.error('[rasoi] recipe seed failed:', e.message); }
+  } catch (e) { console.error('[kyakhaye] recipe seed failed:', e.message); }
   return new Promise((resolve) => {
     server.listen(PORT, () => {
-      console.log(`[rasoi] listening on :${PORT}`);
+      console.log(`[kyakhaye] listening on :${PORT}`);
       resolve(server);
     });
   });
 }
 
 if (require.main === module) {
-  start().catch((e) => { console.error('[rasoi] failed to start:', e.message); process.exit(1); });
+  start().catch((e) => { console.error('[kyakhaye] failed to start:', e.message); process.exit(1); });
 }
 
 module.exports = { app, server, io, start, pool };

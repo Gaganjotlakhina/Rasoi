@@ -1,4 +1,4 @@
-// Rasoi suggestion engine — ingredient normalization + match scoring.
+// Kya Khaye suggestion engine — ingredient normalization + match scoring.
 // Shared by server.js and the tests (no DB dependency here).
 'use strict';
 
