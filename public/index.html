@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>WhatToEat — one kitchen list the whole family sees</title>
+<meta name="description" content="WhatToEat: the family kitchen stock list that updates live on everyone's phone.">
+<link rel="stylesheet" href="/style.css">
+<script src="/socket.io/socket.io.js"></script>
+<script src="/voice-parse.js"></script>
+</head>
+<body>
+
+<!-- shared header (home view only) -->
+<header id="appHeader" class="app-header hidden">
+  <div class="inner">
+    <div class="brand-row">
+      <div class="brand-logo">🍽️</div>
+      <div class="brand-name">WhatToEat<small>FAMILY KITCHEN · LIVE</small></div>
+    </div>
+    <div class="hh-row">
+      <span class="hh-name" id="hhName">–</span>
+      <button class="code-chip" id="codeChip" title="Tap to copy invite code">CODE: –</button>
+    </div>
+    <div class="online-row" id="onlineRow"><span class="online-label">connecting…</span></div>
+  </div>
+</header>
+
+<main class="wrap">
+
+  <!-- LANDING -->
+  <section id="view-landing">
+    <div class="hero">
+      <div class="big-logo">🍽️</div>
+      <h1>WhatToEat</h1>
+      <p>One kitchen list the whole family sees — <b>live</b>.<br>Add stock, use things up, and everyone stays in sync.</p>
+    </div>
+
+    <div class="card">
+      <h3 style="margin:0 0 4px">🏠 Start a household</h3>
+      <p style="margin:0;color:var(--muted);font-size:14px">Name it anything — "Sharma Kitchen", "Apartment 4B"…</p>
+      <label class="field">HOUSEHOLD NAME</label>
+      <input type="text" id="createName" placeholder="e.g. Sharma Kitchen" maxlength="60" autocomplete="off">
+      <button class="btn" id="btnCreate">Create household →</button>
+    </div>
+
+    <div class="divider">or join your family</div>
+
+    <div class="card">
+      <h3 style="margin:0 0 4px">🔑 Have an invite code?</h3>
+      <p style="margin:0;color:var(--muted);font-size:14px">Ask a family member for the 6-letter code.</p>
+      <label class="field">INVITE CODE</label>
+      <input type="text" id="joinCode" placeholder="e.g. KX7Q2M" maxlength="6" autocomplete="off" style="text-transform:uppercase;letter-spacing:2px;font-weight:700">
+      <button class="btn secondary" id="btnJoin">Join household →</button>
+    </div>
+  </section>
+
+  <!-- ONBOARDING -->
+  <section id="view-onboard" class="hidden">
+    <div class="hero" style="padding-top:20px">
+      <div class="big-logo" style="width:64px;height:64px;font-size:34px">👋</div>
+      <h1 style="font-size:24px">Who's this?</h1>
+      <p>Pick a name and a face so the family knows who used the last egg 🥚</p>
+    </div>
+    <div class="card">
+      <label class="field" style="margin-top:0">YOUR NAME</label>
+      <input type="text" id="memberName" placeholder="e.g. Gaganjot" maxlength="60" autocomplete="off">
+      <label class="field">YOUR AVATAR</label>
+      <div class="avatar-tabs">
+        <div class="avatar-tab active" id="tabEmoji">😀 Emoji</div>
+        <div class="avatar-tab" id="tabPhoto">📸 Photo</div>
+      </div>
+      <div id="emojiPane">
+        <div class="emoji-grid" id="emojiGrid"></div>
+      </div>
+      <div id="photoPane" class="hidden" style="text-align:center">
+        <img id="photoPreview" class="photo-preview hidden" alt="your photo" style="margin-left:auto;margin-right:auto">
+        <label class="file-btn">📷 Take / upload a selfie
+          <input type="file" id="photoInput" accept="image/*" capture="user" class="hidden">
+        </label>
+        <p style="font-size:12px;color:var(--muted)">Kept small &amp; private — stored with your household only.</p>
+      </div>
+      <button class="btn" id="btnOnboard">Let's cook →</button>
+      <button class="btn ghost" id="btnBackLanding">← back</button>
+    </div>
+  </section>
+
+  <!-- HOME / STOCK -->
+  <section id="view-home" class="hidden">
+    <div id="stockSections"></div>
+    <div class="phase-note">🍳 Dish ideas, macro filters &amp; family voting arrive in the next update.</div>
+  </section>
+
+</main>
+
+<button id="fab" class="fab hidden" title="Add item">+</button>
+
+<!-- add/edit modal -->
+<div id="modalBack" class="modal-back hidden">
+  <div class="modal">
+    <h3 id="modalTitle">Add to stock</h3>
+    <input type="hidden" id="editId">
+    <label class="field">ITEM NAME</label>
+    <div class="name-row">
+      <input type="text" id="fName" placeholder="e.g. Eggs, Atta, Milk" maxlength="60" autocomplete="off">
+      <button id="micBtn" class="mic-btn hidden" title="Speak your list 🎤">🎤</button>
+    </div>
+    <div id="voicePane" class="hidden">
+      <div id="voiceStatus" class="voice-status">Tap the mic and speak your list — e.g. “two kilos of atta, a dozen eggs”</div>
+      <div id="voiceTranscript" class="voice-transcript hidden"></div>
+      <div id="voiceChips"></div>
+      <button class="btn small hidden" id="btnVoiceAdd" style="width:100%;margin-top:10px">Add items →</button>
+    </div>
+    <div class="row2">
+      <div><label class="field">QUANTITY</label><input type="number" id="fQty" min="0" step="any" value="1"></div>
+      <div><label class="field">UNIT</label>
+        <select id="fUnit">
+          <option>pcs</option><option>g</option><option>kg</option><option>ml</option>
+          <option>L</option><option>cups</option><option>tbsp</option><option>tsp</option>
+          <option>packets</option><option>bunches</option>
+        </select>
+      </div>
+    </div>
+    <label class="field">WHERE IS IT?</label>
+    <div class="seg" id="fLoc">
+      <button data-loc="kitchen" class="active">🍳 Kitchen</button>
+      <button data-loc="fridge">🧊 Fridge</button>
+      <button data-loc="freezer">❄️ Freezer</button>
+    </div>
+    <button class="btn" id="btnSaveItem">Save</button>
+    <div class="danger-zone hidden" id="editDanger">
+      <button class="btn warn small" id="btnUseUp" style="flex:1">Use up ✨</button>
+      <button class="btn danger small" id="btnDelete" style="flex:1">Delete 🗑️</button>
+    </div>
+    <button class="btn ghost" id="btnCloseModal">Cancel</button>
+  </div>
+</div>
+
+<div id="toasts"></div>
+
+<script src="/app.js"></script>
+</body>
+</html>

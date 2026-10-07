@@ -1,0 +1,24 @@
+# WhatToEat on Render (repo: rasoi) — one-click deploy via Blueprint.
+#
+# DASHBOARD STEPS (do once):
+#   1. Render dashboard → New → Blueprint
+#   2. Connect / select the `rasoi` repo (Gaganjotlakhina/rasoi)
+#   3. When prompted for the DATABASE_URL env var, paste the connection string
+#      of the existing 1v1 app's Postgres (Render dashboard → that database →
+#      Connections → External Database URL). Rasoi uses rasoi_-prefixed tables,
+#      so it will not clash with the 1v1 tables.
+#   4. Apply. Every git push to main redeploys automatically.
+#
+# NOTE: web service is on the FREE plan (user's choice). It sleeps after ~15
+# minutes with no traffic; the first visit after idle takes ~30-60s to wake.
+# Stock data is safe in Postgres. Upgrade to Starter ($7/mo) for always-on.
+
+services:
+  - type: web
+    name: rasoi
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        sync: false
