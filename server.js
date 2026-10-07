@@ -7,6 +7,19 @@ const { Pool } = require('pg');
 const { Server } = require('socket.io');
 const { seedRecipes, recipeCount } = require('./seed');
 const { recipeView, rankRecipes, applyFilters, normalizeName, convertQty } = require('./suggest');
+const { parseReceiptText } = require('./parse-receipt');
+
+// OCR (Phase 4): tesseract is optional — the Docker image installs it, but
+// local dev / tests may not have it. /scan answers 503 without it.
+let tesseract = null;
+let tesseractReady = false;
+try {
+  tesseract = require('node-tesseract-ocr');
+  require('child_process').execSync('command -v tesseract', { stdio: 'ignore' });
+  tesseractReady = true;
+} catch (e) {
+  console.warn('[kyakhaye] tesseract not available — receipt scanning (/scan) disabled');
+}
 
 const PORT = process.env.PORT || 3000;
 const DATABASE_URL = process.env.DATABASE_URL || '';
@@ -66,10 +79,10 @@ function validAvatar(avatar, kind) {
 }
 
 const app = express();
-app.use(express.json({ limit: '1mb' }));
+app.use(express.json({ limit: '8mb' })); // photos arrive as data URLs
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.get('/health', (req, res) => res.json({ ok: true, app: 'kyakhaye', phase: 3 }));
+app.get('/health', (req, res) => res.json({ ok: true, app: 'kyakhaye', phase: 4 }));
 
 // ---- households ----
 app.post('/api/households', async (req, res) => {
@@ -234,6 +247,42 @@ app.delete('/api/households/:code/stock/:id', async (req, res) => {
     broadcastStock(hh.join_code, 'removed', item, actor, {});
     res.json({ ok: true });
   } catch (e) { console.error(e); res.status(500).json({ error: 'could not delete item' }); }
+});
+
+// ---- receipt scan (Phase 4) ----
+// POST /api/households/:code/scan {member_id, image} — image is a JPEG/PNG
+// data URL (client downscales to max 1600px). Runs tesseract OCR, parses the
+// text into candidate items, and returns them for user confirmation.
+// OCR can take 10-30s on the free tier; the request simply takes its time.
+app.post('/api/households/:code/scan', async (req, res) => {
+  try {
+    const hh = await householdByCode(req.params.code);
+    if (!hh) return res.status(404).json({ error: 'Household not found' });
+    const actor = await memberById(hh.id, req.body.member_id);
+    if (!actor) return res.status(403).json({ error: 'Unknown member' });
+    const image = req.body.image;
+    if (typeof image !== 'string' || !/^data:image\/(jpeg|jpg|png|webp);base64,/.test(image)) {
+      return res.status(400).json({ error: 'A JPEG/PNG photo is required' });
+    }
+    const buf = Buffer.from(image.split(',')[1] || '', 'base64');
+    if (!buf.length || buf.length > 6 * 1024 * 1024) {
+      return res.status(400).json({ error: 'Photo is missing or too large' });
+    }
+    if (!tesseractReady) {
+      return res.status(503).json({ error: 'Receipt scanning is not available on this server yet' });
+    }
+    req.setTimeout(120000);
+    res.setTimeout(120000);
+    let text = '';
+    try {
+      text = await tesseract.recognize(buf, { oem: 1, psm: 6, lang: 'eng' });
+    } catch (e) {
+      console.error('[kyakhaye] OCR failed:', e.message);
+      return res.status(500).json({ error: 'Could not read the photo — try a clearer one' });
+    }
+    const items = parseReceiptText(text);
+    res.json({ items });
+  } catch (e) { console.error(e); res.status(500).json({ error: 'could not scan the photo' }); }
 });
 
 // ---- to buy grocery list (Phase 3) ----
