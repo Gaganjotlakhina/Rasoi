@@ -1,15 +1,16 @@
-// WhatToEat server (repo: rasoi) — realtime family kitchen stock. Phase 1.
-// Express REST + Socket.io realtime rooms + Postgres (DATABASE_URL).
+// Rasoi server — realtime family kitchen stock + dish suggestions. Phase 2.
 const express = require('express');
 const http = require('http');
 const path = require('path');
 const fs = require('fs');
 const { Pool } = require('pg');
 const { Server } = require('socket.io');
+const { seedRecipes, recipeCount } = require('./seed');
+const { recipeView, rankRecipes, applyFilters, normalizeName, convertQty } = require('./suggest');
 
 const PORT = process.env.PORT || 3000;
 const DATABASE_URL = process.env.DATABASE_URL || '';
-if (!DATABASE_URL) console.warn('[whattoeat] WARNING: DATABASE_URL is not set');
+if (!DATABASE_URL) console.warn('[rasoi] WARNING: DATABASE_URL is not set');
 
 const pool = new Pool({
   connectionString: DATABASE_URL || undefined,
@@ -68,7 +69,7 @@ const app = express();
 app.use(express.json({ limit: '1mb' }));
 app.use(express.static(path.join(__dirname, 'public')));
 
-app.get('/health', (req, res) => res.json({ ok: true, app: 'whattoeat', phase: 1 }));
+app.get('/health', (req, res) => res.json({ ok: true, app: 'rasoi', phase: 2 }));
 
 // ---- households ----
 app.post('/api/households', async (req, res) => {
@@ -227,6 +228,115 @@ app.delete('/api/households/:code/stock/:id', async (req, res) => {
   } catch (e) { console.error(e); res.status(500).json({ error: 'could not delete item' }); }
 });
 
+// ---- recipes & suggestions (Phase 2) ----
+async function loadRecipe(id) {
+  const r = await pool.query('SELECT * FROM rasoi_recipes WHERE id = $1', [id]);
+  if (!r.rows.length) return null;
+  const recipe = r.rows[0];
+  const ings = await pool.query(
+    'SELECT name, qty, unit, note FROM rasoi_recipe_ingredients WHERE recipe_id = $1 ORDER BY id', [id]);
+  const steps = await pool.query(
+    'SELECT step_no, text FROM rasoi_recipe_steps WHERE recipe_id = $1 ORDER BY step_no', [id]);
+  recipe.ingredients = ings.rows.map((x) => ({
+    name: x.name, qty: x.qty == null ? null : Number(x.qty), unit: x.unit, note: x.note,
+  }));
+  recipe.steps = steps.rows;
+  recipe.protein_g = Number(recipe.protein_g); recipe.carbs_g = Number(recipe.carbs_g);
+  recipe.fat_g = Number(recipe.fat_g); recipe.calories = Number(recipe.calories);
+  return recipe;
+}
+
+async function loadAllRecipes() {
+  const r = await pool.query('SELECT id FROM rasoi_recipes ORDER BY name');
+  const out = [];
+  for (const row of r.rows) out.push(await loadRecipe(row.id));
+  return out.filter(Boolean);
+}
+
+function numOrNull(v) {
+  if (v === undefined || v === null || v === '') return null;
+  const n = Number(v);
+  return Number.isFinite(n) ? n : null;
+}
+
+// GET /api/households/:code/suggest?meal=&diet=&minProtein=&maxCalories=&maxCarbs=&servings=&heritage=
+app.get('/api/households/:code/suggest', async (req, res) => {
+  try {
+    const hh = await householdByCode(req.params.code);
+    if (!hh) return res.status(404).json({ error: 'Household not found' });
+    const stock = (await pool.query(
+      'SELECT name, qty FROM rasoi_stock WHERE household_id = $1', [hh.id])).rows;
+    const servings = numOrNull(req.query.servings) || 4;
+    const filters = {
+      meal: (req.query.meal || 'any').toLowerCase(),
+      diet: (req.query.diet || 'any').toLowerCase(),
+      heritage: (req.query.heritage || '').toLowerCase(),
+      minProtein: numOrNull(req.query.minProtein),
+      maxCalories: numOrNull(req.query.maxCalories),
+      maxCarbs: numOrNull(req.query.maxCarbs),
+    };
+    const recipes = applyFilters(await loadAllRecipes(), filters);
+    const views = rankRecipes(recipes.map((r) => recipeView(r, stock, servings)));
+    res.json({ servings, count: views.length, suggestions: views });
+  } catch (e) { console.error(e); res.status(500).json({ error: 'suggest failed' }); }
+});
+
+// GET /api/households/:code/recipes/:id?servings=
+app.get('/api/households/:code/recipes/:id', async (req, res) => {
+  try {
+    const hh = await householdByCode(req.params.code);
+    if (!hh) return res.status(404).json({ error: 'Household not found' });
+    const recipe = await loadRecipe(req.params.id);
+    if (!recipe) return res.status(404).json({ error: 'Recipe not found' });
+    const stock = (await pool.query(
+      'SELECT name, qty FROM rasoi_stock WHERE household_id = $1', [hh.id])).rows;
+    const servings = numOrNull(req.query.servings) || recipe.servings || 4;
+    res.json(recipeView(recipe, stock, servings));
+  } catch (e) { console.error(e); res.status(500).json({ error: 'lookup failed' }); }
+});
+
+// POST /api/households/:code/recipes/:id/cook — deduct used ingredients from
+// stock (server-side matching so the whole family sees it live). Body:
+// { member_id, servings }. Responds { used:[{name,qty,unit}], missing:[{name,qty,unit}] }.
+app.post('/api/households/:code/recipes/:id/cook', async (req, res) => {
+  try {
+    const hh = await householdByCode(req.params.code);
+    if (!hh) return res.status(404).json({ error: 'Household not found' });
+    const actor = await memberById(hh.id, req.body.member_id);
+    if (!actor) return res.status(403).json({ error: 'Unknown member' });
+    const recipe = await loadRecipe(req.params.id);
+    if (!recipe) return res.status(404).json({ error: 'Recipe not found' });
+    const servings = Math.max(1, Math.min(24, Number(req.body.servings) || recipe.servings || 4));
+    const factor = servings / Math.max(1, recipe.servings);
+    const stock = (await pool.query(
+      'SELECT * FROM rasoi_stock WHERE household_id = $1', [hh.id])).rows;
+    const used = [], missing = [];
+    for (const ing of recipe.ingredients) {
+      const need = ing.qty == null ? null : Math.round(Number(ing.qty) * factor * 100) / 100;
+      const match = stock.find((s) => Number(s.qty) > 0 && normalizeName(s.name) === normalizeName(ing.name));
+      if (!match || need == null) { missing.push({ name: ing.name, qty: need, unit: ing.unit || '' }); continue; }
+      const inStockUnit = convertQty(need, ing.unit, match.unit);
+      if (inStockUnit == null) { missing.push({ name: ing.name, qty: need, unit: ing.unit || '' }); continue; }
+      const deduct = Math.min(Number(match.qty), inStockUnit);
+      if (deduct <= 0) { missing.push({ name: ing.name, qty: need, unit: ing.unit || '' }); continue; }
+      const rows = (await pool.query(
+        `UPDATE rasoi_stock SET qty = GREATEST(0, qty - $1), updated_by = $2, updated_at = now()
+         WHERE id = $3 AND household_id = $4 RETURNING *`,
+        [deduct, actor.id, match.id, hh.id]
+      )).rows;
+      if (rows.length) {
+        const item = stockRow(rows[0]);
+        match.qty = item.qty; // keep local copy fresh for later ingredients
+        const action = item.qty === 0 ? 'used-up' : 'adjusted';
+        broadcastStock(hh.join_code, action, item, actor, { delta: -deduct });
+        used.push({ name: item.name, qty: Math.round(deduct * 100) / 100, unit: item.unit });
+      }
+      if (deduct < inStockUnit) missing.push({ name: ing.name, qty: Math.round((inStockUnit - deduct) * 100) / 100, unit: match.unit });
+    }
+    res.json({ servings, used, missing });
+  } catch (e) { console.error(e); res.status(500).json({ error: 'cook failed' }); }
+});
+
 // ---- realtime ----
 const server = http.createServer(app);
 const io = new Server(server, { cors: { origin: '*' } });
@@ -304,16 +414,22 @@ io.on('connection', (socket) => {
 
 async function start() {
   await migrate();
+  try {
+    if ((await recipeCount(pool)) === 0) {
+      const n = await seedRecipes(pool);
+      console.log(`[rasoi] seeded ${n} recipes`);
+    }
+  } catch (e) { console.error('[rasoi] recipe seed failed:', e.message); }
   return new Promise((resolve) => {
     server.listen(PORT, () => {
-      console.log(`[whattoeat] listening on :${PORT}`);
+      console.log(`[rasoi] listening on :${PORT}`);
       resolve(server);
     });
   });
 }
 
 if (require.main === module) {
-  start().catch((e) => { console.error('[whattoeat] failed to start:', e.message); process.exit(1); });
+  start().catch((e) => { console.error('[rasoi] failed to start:', e.message); process.exit(1); });
 }
 
 module.exports = { app, server, io, start, pool };

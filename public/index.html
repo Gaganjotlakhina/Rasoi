@@ -3,8 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
-<title>WhatToEat — one kitchen list the whole family sees</title>
-<meta name="description" content="WhatToEat: the family kitchen stock list that updates live on everyone's phone.">
+<title>Rasoi — what to eat, from your own kitchen</title>
+<meta name="description" content="Rasoi: the family kitchen stock list that updates live on everyone's phone, with dish ideas matched to what's in stock.">
 <link rel="stylesheet" href="/style.css">
 <script src="/socket.io/socket.io.js"></script>
 <script src="/voice-parse.js"></script>
@@ -15,8 +15,8 @@
 <header id="appHeader" class="app-header hidden">
   <div class="inner">
     <div class="brand-row">
-      <div class="brand-logo">🍽️</div>
-      <div class="brand-name">WhatToEat<small>FAMILY KITCHEN · LIVE</small></div>
+      <div class="brand-logo">🪔</div>
+      <div class="brand-name">Rasoi<small>FAMILY KITCHEN · LIVE</small></div>
     </div>
     <div class="hh-row">
       <span class="hh-name" id="hhName">–</span>
@@ -31,9 +31,9 @@
   <!-- LANDING -->
   <section id="view-landing">
     <div class="hero">
-      <div class="big-logo">🍽️</div>
-      <h1>WhatToEat</h1>
-      <p>One kitchen list the whole family sees — <b>live</b>.<br>Add stock, use things up, and everyone stays in sync.</p>
+      <div class="big-logo">🪔</div>
+      <h1>Rasoi</h1>
+      <p>One kitchen list the whole family sees — <b>live</b>.<br>Add stock, get dish ideas, and cook together.</p>
     </div>
 
     <div class="card">
@@ -85,10 +85,61 @@
     </div>
   </section>
 
-  <!-- HOME / STOCK -->
+  <!-- HOME -->
   <section id="view-home" class="hidden">
-    <div id="stockSections"></div>
-    <div class="phase-note">🍳 Dish ideas, macro filters &amp; family voting arrive in the next update.</div>
+    <div class="tabs">
+      <button id="tabStock" class="tab active">🧊 Stock</button>
+      <button id="tabEat" class="tab">🍽️ What to eat?</button>
+    </div>
+
+    <div id="stockPane">
+      <div id="stockSections"></div>
+    </div>
+
+    <div id="eatPane" class="hidden">
+      <div class="shelf-wrap">
+        <h2 class="shelf-title">🏠 Back home classics</h2>
+        <p class="shelf-sub">Dadi-nani recipes — the food grandparents thrived on</p>
+        <div id="classicsShelf" class="shelf"><div class="shelf-loading">Loading classics… 🪔</div></div>
+      </div>
+
+      <div class="card">
+        <h3 style="margin:0 0 2px">🔍 Find a dish</h3>
+        <p style="margin:0 0 4px;color:var(--muted);font-size:13px">Matched against your family's stock, live.</p>
+        <label class="field">MEAL</label>
+        <div class="pills" id="mealPills">
+          <button data-v="any" class="active">Any</button>
+          <button data-v="breakfast">🌅 Breakfast</button>
+          <button data-v="lunch">☀️ Lunch</button>
+          <button data-v="dinner">🌙 Dinner</button>
+          <button data-v="snack">🍿 Snack</button>
+        </div>
+        <label class="field">DIET</label>
+        <div class="pills" id="dietPills">
+          <button data-v="any" class="active">Any</button>
+          <button data-v="veg">🥬 Veg</button>
+          <button data-v="egg">🥚 Egg</button>
+          <button data-v="nonveg">🍗 Non-veg</button>
+        </div>
+        <div class="row2" style="margin-top:6px">
+          <div><label class="field">MIN PROTEIN (g)</label><input type="number" id="fMinProtein" min="0" step="any" placeholder="e.g. 15"></div>
+          <div><label class="field">MAX CALORIES</label><input type="number" id="fMaxCal" min="0" step="any" placeholder="e.g. 400"></div>
+        </div>
+        <div class="row2">
+          <div><label class="field">MAX CARBS (g)</label><input type="number" id="fMaxCarbs" min="0" step="any" placeholder="e.g. 50"></div>
+          <div><label class="field">SERVINGS</label>
+            <div class="serv-step">
+              <button id="servMinus" class="step-btn minus">−</button>
+              <span id="servVal">4</span>
+              <button id="servPlus" class="step-btn">+</button>
+            </div>
+          </div>
+        </div>
+        <button class="btn" id="btnFind">Find dishes 🍽️</button>
+      </div>
+
+      <div id="suggestResults"></div>
+    </div>
   </section>
 
 </main>
@@ -137,6 +188,32 @@
 </div>
 
 <div id="toasts"></div>
+
+<!-- recipe detail modal -->
+<div id="recipeBack" class="modal-back hidden">
+  <div class="modal">
+    <h3 id="recipeName">–</h3>
+    <div id="recipeMeta" class="recipe-meta"></div>
+    <div id="recipeMacros" class="macro-row"></div>
+    <div id="recipeHealth" class="health-note hidden"></div>
+    <div class="row2" style="margin-top:10px;align-items:end">
+      <div><label class="field" style="margin-top:0">SERVINGS</label>
+        <div class="serv-step">
+          <button id="rServMinus" class="step-btn minus">−</button>
+          <span id="rServVal">4</span>
+          <button id="rServPlus" class="step-btn">+</button>
+        </div>
+      </div>
+      <div style="text-align:right"><span id="recipeMatch" class="match-pill"></span></div>
+    </div>
+    <h4 class="rsec">🧂 Ingredients</h4>
+    <div id="recipeIngs"></div>
+    <h4 class="rsec">👩‍🍳 Steps</h4>
+    <ol id="recipeSteps" class="rsteps"></ol>
+    <button class="btn" id="btnCook">Cook this 🍳</button>
+    <button class="btn ghost" id="btnCloseRecipe">Close</button>
+  </div>
+</div>
 
 <script src="/app.js"></script>
 </body>
