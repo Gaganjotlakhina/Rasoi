@@ -64,5 +64,25 @@
       .filter(Boolean);
   }
 
-  return { parseVoiceList: parseVoiceList, NUM_WORDS: NUM_WORDS, UNIT_WORDS: UNIT_WORDS };
+  // Merge accumulated final transcript + live interim text for display.
+  // Pure function so the UI can stream "what the app hears" into the text box.
+  function mergeVoiceTranscript(finalText, interimText) {
+    return ((finalText || '') + ' ' + (interimText || '')).trim().replace(/\s+/g, ' ');
+  }
+
+  // Commit the final transcript when listening stops: returns the cleaned
+  // text, or null when there is nothing to commit (caller shows the
+  // "didn't catch that" state instead of leaving a dead UI).
+  function finalizeVoiceTranscript(finalText) {
+    var t = (finalText || '').trim().replace(/\s+/g, ' ');
+    return t ? t : null;
+  }
+
+  return {
+    parseVoiceList: parseVoiceList,
+    mergeVoiceTranscript: mergeVoiceTranscript,
+    finalizeVoiceTranscript: finalizeVoiceTranscript,
+    NUM_WORDS: NUM_WORDS,
+    UNIT_WORDS: UNIT_WORDS,
+  };
 });

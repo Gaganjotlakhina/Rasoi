@@ -1,6 +1,6 @@
 // Unit tests for the Kya Khaye voice-list parser. No DB needed.
 // Run: node test/voice-parse-test.js
-const { parseVoiceList } = require('../public/voice-parse.js');
+const { parseVoiceList, mergeVoiceTranscript, finalizeVoiceTranscript } = require('../public/voice-parse.js');
 
 let failures = 0;
 function eq(name, actual, expected) {
@@ -25,6 +25,22 @@ eq('empty string', parseVoiceList(''), []);
 eq('whitespace only', parseVoiceList('   '), []);
 eq('dozen without article', parseVoiceList('dozen bananas'), [{ name: 'bananas', qty: 12, unit: 'pcs' }]);
 eq('multi-word item name kept', parseVoiceList('two kilos of whole wheat atta'), [{ name: 'whole wheat atta', qty: 2, unit: 'kg' }]);
+
+// --- transcript merging / finalizing (voice UX flow) ---
+eq('merge final + interim', mergeVoiceTranscript('two kilos of atta ', 'a dozen e'), 'two kilos of atta a dozen e');
+eq('merge interim only', mergeVoiceTranscript('', 'milk'), 'milk');
+eq('merge final only', mergeVoiceTranscript('eggs ', ''), 'eggs');
+eq('merge collapses extra spaces', mergeVoiceTranscript('two  kilos', '  of   atta'), 'two kilos of atta');
+eq('merge both empty', mergeVoiceTranscript('', ''), '');
+eq('merge null-safe', mergeVoiceTranscript(null, undefined), '');
+eq('finalize trims and collapses', finalizeVoiceTranscript('  two kilos of atta   a dozen eggs '), 'two kilos of atta a dozen eggs');
+eq('finalize empty -> null', finalizeVoiceTranscript(''), null);
+eq('finalize whitespace -> null', finalizeVoiceTranscript('   \n  '), null);
+eq('finalize null -> null', finalizeVoiceTranscript(null), null);
+eq('finalized text parses to chips', parseVoiceList(finalizeVoiceTranscript('two kilos of atta, a dozen eggs')), [
+  { name: 'atta', qty: 2, unit: 'kg' },
+  { name: 'eggs', qty: 12, unit: 'pcs' },
+]);
 
 console.log(failures === 0 ? '\n✅ VOICE PARSER TESTS PASSED' : `\n❌ ${failures} PARSER TEST(S) FAILED`);
 process.exit(failures === 0 ? 0 : 1);
