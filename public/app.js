@@ -235,6 +235,10 @@
         btn.addEventListener('click', function () { return onItemAction(id, btn.getAttribute('data-act')); });
       });
     });
+    // Tapping the "Nothing here yet" note opens the add-item sheet too.
+    box.querySelectorAll('.empty-note').forEach(function (el) {
+      el.addEventListener('click', function () { openModal(null); });
+    });
   }
 
   function onItemAction(id, act) {
@@ -368,81 +372,144 @@
   var VOICE_UNITS = ['pcs', 'g', 'kg', 'ml', 'L', 'cups', 'tbsp', 'tsp', 'packets', 'bunches'];
   var voiceChips = []; // {name, qty, unit} — user confirms before anything is added
   var voiceRec = null, voiceListening = false;
+  var voiceFinalText = '';   // accumulated final transcript for this session
+  var voiceGotResult = false;
+  var voiceSafetyTimer = null;
   var SpeechRec = window.SpeechRecognition || window.webkitSpeechRecognition;
   function voiceSupported() { return !!SpeechRec && !!(window.WhatToEatVoice); }
+
+  // Mic button visibly toggles into a STOP button while listening so the
+  // user always knows how to end the session.
+  function setMicUI(listening) {
+    var mb = $('micBtn');
+    if (!mb) return;
+    mb.classList.toggle('listening', listening);
+    mb.textContent = listening ? '\u23F9' : '\uD83C\uDFA4';
+    mb.title = listening ? 'Stop listening' : 'Speak your list \uD83C\uDFA4';
+  }
+
+  function clearVoiceSafety() {
+    if (voiceSafetyTimer) { clearTimeout(voiceSafetyTimer); voiceSafetyTimer = null; }
+  }
 
   function resetVoice() {
     stopVoice();
     voiceChips = [];
+    voiceFinalText = '';
     $('voicePane').classList.add('hidden');
     $('voiceTranscript').classList.add('hidden');
     $('voiceTranscript').textContent = '';
     $('voiceChips').innerHTML = '';
     $('btnVoiceAdd').classList.add('hidden');
+    setMicUI(false);
     var st = $('voiceStatus');
-    st.textContent = 'Tap the mic and speak your list — e.g. “two kilos of atta, a dozen eggs”';
+    st.textContent = 'Tap the mic and speak your list \u2014 e.g. \u201Ctwo kilos of atta, a dozen eggs\u201D';
     st.classList.remove('listening');
     $('micBtn').classList.toggle('hidden', !voiceSupported());
   }
 
   function stopVoice() {
+    clearVoiceSafety();
     voiceListening = false;
-    var mb = $('micBtn'); if (mb) mb.classList.remove('listening');
+    setMicUI(false);
     var st = $('voiceStatus'); if (st) st.classList.remove('listening');
     if (voiceRec) { try { voiceRec.onend = null; voiceRec.onerror = null; voiceRec.stop(); } catch (e) {} voiceRec = null; }
   }
 
-  function toggleVoice() {
-    resetScan();
-    if (voiceListening) {
-      stopVoice();
-      $('voiceStatus').textContent = voiceChips.length
-        ? 'Got it! Check the items, fix anything, then add 👇'
-        : 'Stopped — tap the mic to try again 🎤';
-      return;
+  // Commit the transcript when listening ends (manual stop, iOS auto-stop on
+  // silence, or the safety net). Never leaves the UI stuck in "Listening\u2026".
+  function finalizeVoice() {
+    var done = window.WhatToEatVoice.finalizeVoiceTranscript(voiceFinalText);
+    stopVoice();
+    if (done) {
+      $('fName').value = done;
+      var parsed = window.WhatToEatVoice.parseVoiceList(done);
+      if (parsed.length) {
+        addVoiceChips(parsed);
+        $('voiceStatus').textContent = 'Got it! Check the items, fix anything, then add \uD83D\uDC47';
+      } else {
+        $('voiceStatus').textContent = 'Heard you, but couldn\u2019t pick out items \u2014 try \u201Ctwo kilos of atta, a dozen eggs\u201D \uD83C\uDFA4';
+      }
+    } else {
+      $('voiceStatus').textContent = 'Didn\u2019t catch that \u2014 tap the mic and try again \uD83C\uDFA4';
     }
+  }
+
+  function startVoiceListening(lang) {
     var rec = new SpeechRec();
     voiceRec = rec;
-    rec.lang = 'en-IN';
-    rec.interimResults = true;
+    rec.lang = lang || 'en-IN';
+    rec.continuous = true;      // iOS Safari needs this for sustained speech
+    rec.interimResults = true; // stream live transcript into the text box
     rec.maxAlternatives = 1;
     voiceListening = true;
+    voiceGotResult = false;
+    voiceFinalText = '';
+    setMicUI(true);
     $('voicePane').classList.remove('hidden');
-    $('micBtn').classList.add('listening');
     var st = $('voiceStatus');
-    st.textContent = '🎙️ Listening… speak your list';
+    st.textContent = '\uD83C\uDFA7 Listening\u2026 tap \u23F9 when you\u2019re done';
     st.classList.add('listening');
-    var finalText = '';
+
+    // Safety net: 90s with zero results -> stop, friendly state, never stuck.
+    clearVoiceSafety();
+    voiceSafetyTimer = setTimeout(function () {
+      if (voiceListening && !voiceGotResult) {
+        stopVoice();
+        $('voiceStatus').textContent = 'Didn\u2019t catch that \u2014 tap the mic and try again \uD83C\uDFA4';
+        toast('Didn\u2019t hear anything \u2014 try speaking a little louder \uD83C\uDFA4');
+      }
+    }, 90000);
+
     rec.onresult = function (ev) {
+      voiceGotResult = true;
       var interim = '';
       for (var i = ev.resultIndex; i < ev.results.length; i++) {
         var t = ev.results[i][0].transcript;
-        if (ev.results[i].isFinal) finalText += t + ' ';
+        if (ev.results[i].isFinal) voiceFinalText += t + ' ';
         else interim += t;
       }
-      var show = (finalText + interim).trim();
-      if (show) {
-        var tr = $('voiceTranscript');
-        tr.textContent = '“' + show + '”';
-        tr.classList.remove('hidden');
-      }
-      if (finalText.trim()) addVoiceChips(window.WhatToEatVoice.parseVoiceList(finalText));
+      // Live transcript straight into the ITEM NAME box so he SEES he's heard.
+      var show = window.WhatToEatVoice.mergeVoiceTranscript(voiceFinalText, interim);
+      if (show) $('fName').value = show;
     };
+
     rec.onerror = function (ev) {
-      stopVoice();
-      $('voiceStatus').textContent = ev.error === 'not-allowed'
-        ? 'Mic blocked — allow microphone access in the browser and try again 🎤'
-        : 'Didn\'t catch that — tap the mic and try again 🎤';
-    };
-    rec.onend = function () {
-      if (voiceListening) {
-        stopVoice();
-        $('voiceStatus').textContent = voiceChips.length
-          ? 'Got it! Check the items, fix anything, then add 👇'
-          : 'Didn\'t catch that — tap the mic and try again 🎤';
+      var err = ev.error || '';
+      if (err === 'language-not-supported' && rec.lang !== 'en-US') {
+        // en-IN unsupported here -> retry once in en-US.
+        try { rec.onend = null; rec.onerror = null; rec.stop(); } catch (e) {}
+        voiceRec = null;
+        startVoiceListening('en-US');
+        return;
       }
+      stopVoice();
+      var msg;
+      if (err === 'not-allowed' || err === 'service-not-allowed') msg = 'Microphone blocked \u2014 allow it in Safari settings, then try again \uD83C\uDFA4';
+      else if (err === 'no-speech') msg = 'I couldn\u2019t hear you \u2014 try again \uD83C\uDFA4';
+      else if (err === 'audio-capture') msg = 'No microphone found on this device \uD83C\uDFA4';
+      else if (err === 'network') msg = 'Speech needs the internet \u2014 check your connection \uD83C\uDFA4';
+      else msg = 'Didn\u2019t catch that \u2014 tap the mic and try again \uD83C\uDFA4';
+      $('voiceStatus').textContent = msg;
+      toast(msg);
     };
-    try { rec.start(); } catch (e) { stopVoice(); }
+
+    rec.onend = function () {
+      // iOS auto-stops recognition on long silence -> finalize gracefully.
+      if (voiceListening) finalizeVoice();
+    };
+
+    try { rec.start(); }
+    catch (e) {
+      stopVoice();
+      $('voiceStatus').textContent = 'Couldn\u2019t start listening \u2014 tap the mic and try again \uD83C\uDFA4';
+    }
+  }
+
+  function toggleVoice() {
+    resetScan();
+    if (voiceListening) { finalizeVoice(); return; }
+    startVoiceListening('en-IN');
   }
 
   function addVoiceChips(parsed) {
